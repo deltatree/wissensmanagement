@@ -1,0 +1,13 @@
+{
+  "name": "wissensmanagement",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "build:confluence": "node scripts/build-confluence-single-file.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
+}

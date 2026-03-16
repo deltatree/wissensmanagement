@@ -1,22 +1,62 @@
 # wissensmanagement
 
-## Azure OpenAI Confluence Prototype
+Browser-first Confluence Topic Knowledge System.
 
-Die Datei `index.html` ist ein reiner HTML+JavaScript Prototyp fuer einen Chat gegen einen Azure OpenAI Endpoint.
-Die Seite ist passwortgeschuetzt; lokal gespeicherte Daten werden verschluesselt abgelegt.
+## Was ist geliefert?
 
-### Start lokal
+Die Anwendung ist jetzt ein durchgaengiger vertikaler Slice fuer kollaboratives Wissensmanagement auf Confluence:
 
-1. Datei `index.html` im Browser oeffnen.
-2. Konfigurieren:
-   - Endpoint, z. B. `https://<resource>.openai.azure.com`
-   - Model/Deployment
-   - API-Key
-   - API-Modus (`v1` oder `deployment`)
-3. Nachricht eingeben und senden.
-4. Bei jedem neuen Seitenaufruf das Passwort erneut eingeben (wird nicht gespeichert).
+- Topic-zentriertes Modell mit Parent/Child-Hierarchie
+- Granularitaetsbewertung inkl. Split-Empfehlungen
+- Confluence als Shared Registry (Import + Sync von Topic-Subpages)
+- Semantic Search ueber Topic-Chunks mit nachvollziehbarem Kontext
+- Provider-Abstraktion:
+  - `local-browser` als Default
+  - `azure` als optionale Alternative
+- Passwort-geschuetzter, lokal verschluesselter Zustand
 
-### Confluence Durchstich
+## Projektstruktur
 
-- Wenn JavaScript in deiner Confluence-Instanz im HTML-Makro erlaubt ist: Inhalt aus `index.html` einbetten.
-- Wenn JavaScript blockiert ist (haeufig in Confluence Cloud): `index.html` extern hosten und per IFrame einbinden.
+- `index.html` - UI Shell
+- `src/app.js` - App-Orchestrierung
+- `src/domain.js` - Fachlogik (Topics, Qualitaet, Chunking)
+- `src/retrieval.js` - Suche und Ranking
+- `src/crypto-store.js` - verschluesselte Speicherung + Migration
+- `src/providers/*` - Provider-Implementierungen
+- `src/confluence-service.js` - Confluence-API Integration
+- `tests/*.test.mjs` - Unit-Tests
+- `_bmad-output/*` - BMAD-Artefakte (Baseline, Domain, Epics/Stories, Architektur, Implementierung)
+
+## Start
+
+1. `index.html` im Browser oeffnen (oder in Confluence als HTML-Makro/iframe hosten).
+2. Passwort setzen/entsperren.
+3. Unter `AI Provider` den aktiven Provider konfigurieren.
+4. Unter `Confluence Registry` Root-Page + Auth konfigurieren.
+5. Topics anlegen, bewerten und nach Confluence syncen.
+6. Unter `Search & Retrieval` Index aufbauen und suchen.
+
+## Tests
+
+```bash
+npm test
+```
+
+## Single-File Build fuer Confluence (ohne externe Referenzen)
+
+```bash
+npm run build:confluence
+```
+
+Ergebnis:
+- Output-Datei: `dist/confluence-embed.html`
+- Build bricht mit Fehler ab, sobald externe Referenzen erkannt werden
+
+GitHub Actions:
+- Workflow: `.github/workflows/build-confluence-single-file.yml`
+- Fuehrt Tests + Single-File-Build aus und publiziert das HTML als Artifact
+
+## Hinweise zum Modellbetrieb
+
+- Default ist browser-lokale Inferenz mit konfigurierbaren multilingualen Modellen.
+- Azure bleibt als optionaler Provider verfuegbar und wird nur bei Auswahl genutzt.

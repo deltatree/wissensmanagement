@@ -3,28 +3,30 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Azure OpenAI Chat Prototype (Confluence)</title>
+  <title>Wissensmanagement - Confluence Topic System</title>
   <style>
     :root {
-      --bg: #f5f7fb;
-      --card: #ffffff;
-      --text: #1c2430;
-      --muted: #5a6778;
-      --border: #d7dfe9;
-      --accent: #0e7490;
-      --accent-2: #115e59;
-      --error: #b91c1c;
-      --user: #dbeafe;
-      --assistant: #ecfeff;
+      --bg: #f4f7f9;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --line: #d5dce3;
+      --text: #1b2430;
+      --muted: #526174;
+      --accent: #0b6f7c;
+      --accent-2: #0f4c81;
+      --warn: #9a3412;
+      --danger: #b91c1c;
+      --ok: #0f766e;
+      --shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
     }
 
     * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-family: "Space Grotesk", "Trebuchet MS", "Segoe UI", sans-serif;
       color: var(--text);
-      background: radial-gradient(circle at top left, #e0f2fe 0%, var(--bg) 30%);
+      background: radial-gradient(circle at 8% 0%, #d9f0f5 0%, var(--bg) 30%);
     }
 
     .hidden { display: none !important; }
@@ -38,11 +40,12 @@
 
     .lock-card {
       width: 100%;
-      max-width: 420px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px;
+      max-width: 460px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 18px;
     }
 
     .lock-card h1 {
@@ -51,57 +54,126 @@
     }
 
     .lock-card p {
-      margin: 0 0 12px;
+      margin: 0 0 14px;
       color: var(--muted);
       line-height: 1.4;
-      font-size: 0.93rem;
+      font-size: 0.94rem;
     }
 
-    .page {
-      max-width: 1100px;
+    .app {
+      max-width: 1250px;
       margin: 0 auto;
       padding: 16px;
       display: grid;
-      gap: 16px;
+      gap: 14px;
     }
 
-    .title {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px;
+    .shell,
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .shell {
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .shell-head {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
     }
 
     .title h1 {
-      margin: 0 0 8px;
+      margin: 0;
       font-size: 1.3rem;
     }
 
     .title p {
-      margin: 4px 0;
+      margin: 4px 0 0;
       color: var(--muted);
-      line-height: 1.4;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
     }
 
-    .layout {
+    .head-right {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #e6f7fa;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--accent-2);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-weight: 700;
+      cursor: pointer;
+      color: var(--text);
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
       display: grid;
-      grid-template-columns: 360px 1fr;
-      gap: 16px;
+      gap: 12px;
     }
 
-    .panel,
-    .chat {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 14px;
+    .grid-2 {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1.15fr 0.85fr;
     }
 
-    .panel h2,
-    .chat h2 {
-      margin: 4px 0 12px;
-      font-size: 1.05rem;
+    .grid-3 {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    .card {
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    .card h2,
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 1.02rem;
     }
 
     .field {
@@ -110,139 +182,161 @@
 
     .field label {
       display: block;
-      font-size: 0.85rem;
       margin-bottom: 5px;
+      font-size: 0.83rem;
+      font-weight: 700;
       color: var(--muted);
-      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
     }
 
     input,
-    select,
     textarea,
+    select,
     button {
       width: 100%;
-      border: 1px solid var(--border);
+      padding: 9px 10px;
       border-radius: 10px;
-      padding: 10px;
-      font-size: 0.95rem;
+      border: 1px solid var(--line);
       font-family: inherit;
-      background: #fff;
-      color: inherit;
-    }
-
-    textarea { resize: vertical; }
-
-    .row {
-      display: grid;
-      gap: 8px;
-      grid-template-columns: 1fr 1fr;
-    }
-
-    .actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .actions button,
-    .composer button,
-    .lock-actions button {
-      cursor: pointer;
-      border-color: transparent;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: #fff;
-      font-weight: 600;
-    }
-
-    .actions button.secondary,
-    .lock-actions button.secondary {
+      font-size: 0.94rem;
       background: #fff;
       color: var(--text);
-      border: 1px solid var(--border);
     }
 
-    .hint {
-      font-size: 0.82rem;
+    button {
+      cursor: pointer;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #fff;
+      border-color: transparent;
+    }
+
+    button.secondary {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+
+    button.warn {
+      background: linear-gradient(135deg, #b45309, var(--warn));
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-row > * {
+      flex: 1 1 140px;
+    }
+
+    textarea { resize: vertical; min-height: 90px; }
+
+    .table-wrap {
+      max-height: 380px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      padding: 8px;
+      border-bottom: 1px solid #edf1f5;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #f8fafc;
+      z-index: 1;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--muted);
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #eef6ff;
+      font-size: 0.76rem;
+      margin-right: 5px;
+      margin-bottom: 4px;
+    }
+
+    .status {
+      min-height: 20px;
+      font-size: 0.88rem;
       color: var(--muted);
       margin-top: 6px;
       line-height: 1.35;
     }
 
-    .messages {
-      height: 460px;
-      overflow: auto;
-      border: 1px solid var(--border);
-      border-radius: 10px;
+    .status.error { color: var(--danger); font-weight: 700; }
+    .status.ok { color: var(--ok); font-weight: 700; }
+
+    .quality-box,
+    .log-box,
+    .result-list {
+      border: 1px solid var(--line);
+      border-radius: 12px;
       padding: 10px;
       background: #fbfdff;
-      margin-bottom: 10px;
+      max-height: 320px;
+      overflow: auto;
     }
 
-    .msg {
-      padding: 10px;
+    .result-item {
+      border: 1px solid #e8eef4;
       border-radius: 10px;
+      padding: 9px;
       margin-bottom: 8px;
-      white-space: pre-wrap;
-      line-height: 1.45;
-      border: 1px solid transparent;
+      background: #fff;
     }
 
-    .msg.user {
-      background: var(--user);
-      border-color: #bfdbfe;
+    .result-item h4 {
+      margin: 0 0 6px;
+      font-size: 0.95rem;
     }
 
-    .msg.assistant {
-      background: var(--assistant);
-      border-color: #bae6fd;
-    }
-
-    .msg .role {
-      font-size: 0.75rem;
-      font-weight: 700;
-      margin-bottom: 5px;
-      opacity: 0.8;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .composer {
-      display: grid;
-      gap: 8px;
-      grid-template-columns: 1fr auto;
-      align-items: end;
-    }
-
-    .composer textarea {
-      min-height: 70px;
-      max-height: 170px;
-    }
-
-    .status {
-      margin-top: 8px;
-      min-height: 20px;
-      font-size: 0.9rem;
+    .meta {
+      font-size: 0.8rem;
       color: var(--muted);
+      margin-bottom: 6px;
     }
 
-    .status.error {
-      color: var(--error);
-      font-weight: 600;
+    .small {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.4;
     }
 
-    .lock-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 12px;
+    a {
+      color: var(--accent-2);
+      text-decoration: none;
     }
 
-    @media (max-width: 950px) {
-      .layout {
+    a:hover { text-decoration: underline; }
+
+    @media (max-width: 980px) {
+      .grid-2,
+      .grid-3 {
         grid-template-columns: 1fr;
-      }
-
-      .messages {
-        height: 360px;
       }
     }
   </style>
@@ -250,7 +344,7 @@
 <body>
   <div id="lockShell" class="lock-shell">
     <section class="lock-card">
-      <h1>Passwortschutz</h1>
+      <h1>Sichere Entsperrung</h1>
       <p id="lockDescription"></p>
 
       <div class="field">
@@ -258,706 +352,257 @@
         <input id="unlockPassword" type="password" autocomplete="off" />
       </div>
 
-      <div class="field hidden" id="confirmWrap">
+      <div id="confirmWrap" class="field hidden">
         <label for="unlockPasswordConfirm">Passwort wiederholen</label>
         <input id="unlockPasswordConfirm" type="password" autocomplete="off" />
       </div>
 
-      <div class="lock-actions">
+      <div class="btn-row">
         <button id="unlockBtn" type="button">Entsperren</button>
-        <button id="resetStorageBtn" class="secondary" type="button">Lokale Daten loeschen</button>
+        <button id="resetStorageBtn" type="button" class="secondary">Lokale Daten loeschen</button>
       </div>
 
       <div id="lockStatus" class="status"></div>
     </section>
   </div>
 
-  <div id="appPage" class="page hidden">
-    <section class="title">
-      <h1>Azure OpenAI Chat Prototype (HTML + JavaScript)</h1>
-      <p>Einfacher Test-Client ohne Build-Tool, geeignet als Durchstich in einer Confluence-Zielumgebung.</p>
-    </section>
-
-    <div class="layout">
-      <aside class="panel">
-        <h2>Verbindung</h2>
-
-        <div class="field">
-          <label for="apiMode">API-Modus</label>
-          <select id="apiMode">
-            <option value="v1">v1 Chat Completions (/openai/v1/chat/completions)</option>
-            <option value="deployment">Deployment Chat Completions (/openai/deployments/...)</option>
-          </select>
+  <main id="appRoot" class="app hidden">
+    <section class="shell">
+      <div class="shell-head">
+        <div class="title">
+          <h1>Topic Knowledge System fuer Confluence</h1>
+          <p>Lokales Browser-AI ist Standard. Azure bleibt als optionaler Provider verfuegbar.</p>
         </div>
 
-        <div class="field">
-          <label for="endpoint">Endpoint (Basis-URL)</label>
-          <input id="endpoint" type="url" placeholder="https://YOUR-RESOURCE-NAME.openai.azure.com" />
+        <div class="head-right">
+          <span id="providerBadge" class="badge">Provider: local-browser</span>
+          <button id="saveAllBtn" type="button" class="secondary">Alles speichern</button>
+          <button id="lockBtn" type="button" class="secondary">Sperren</button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="topics" type="button">Topics</button>
+        <button class="tab-btn" data-tab="search" type="button">Search & Retrieval</button>
+        <button class="tab-btn" data-tab="providers" type="button">AI Provider</button>
+        <button class="tab-btn" data-tab="confluence" type="button">Confluence Registry</button>
+      </div>
+
+      <section id="tab-topics" class="tab-panel active">
+        <div class="grid-2">
+          <article class="card">
+            <h2>Topic bearbeiten</h2>
+
+            <div class="field">
+              <label for="topicTitle">Titel</label>
+              <input id="topicTitle" type="text" placeholder="z. B. Wissensartikel-Lifecycle in Confluence" />
+            </div>
+
+            <div class="field">
+              <label for="topicSummary">Summary</label>
+              <textarea id="topicSummary" placeholder="Kurzbeschreibung der Wissenseinheit"></textarea>
+            </div>
+
+            <div class="field">
+              <label for="topicScopeNotes">Scope Notes</label>
+              <textarea id="topicScopeNotes" placeholder="Abgrenzung: Was gehoert dazu, was nicht?"></textarea>
+            </div>
+
+            <div class="grid-3">
+              <div class="field">
+                <label for="topicSourcePageId">Confluence Source Page ID</label>
+                <input id="topicSourcePageId" type="text" placeholder="123456" />
+              </div>
+              <div class="field">
+                <label for="topicParent">Parent Topic</label>
+                <select id="topicParent"></select>
+              </div>
+              <div class="field">
+                <label for="topicTags">Tags (kommagetrennt)</label>
+                <input id="topicTags" type="text" placeholder="confluence,rag,governance" />
+              </div>
+            </div>
+
+            <div class="btn-row">
+              <button id="newTopicBtn" type="button" class="secondary">Neues Topic</button>
+              <button id="assessTopicBtn" type="button" class="warn">Granularitaet pruefen</button>
+              <button id="saveTopicBtn" type="button">Topic speichern</button>
+              <button id="syncTopicBtn" type="button" class="secondary">Topic nach Confluence syncen</button>
+            </div>
+
+            <div id="topicFormStatus" class="status"></div>
+          </article>
+
+          <article class="card">
+            <h2>Topic Quality</h2>
+            <div id="qualityBox" class="quality-box"></div>
+            <p class="small">Die Bewertung kombiniert AI-Ausgabe (wenn verfuegbar) und heuristische Signals zur Scope-Grenze.</p>
+          </article>
         </div>
 
-        <div class="field">
-          <label for="deployment">Model/Deployment</label>
-          <input id="deployment" type="text" placeholder="z. B. gpt-5.1 oder mein-deployment" />
-        </div>
-
-        <div class="field" id="apiVersionWrap">
-          <label for="apiVersion">API-Version (nur Deployment-Modus)</label>
-          <input id="apiVersion" type="text" value="2024-10-21" />
-        </div>
-
-        <div class="field">
-          <label for="apiKey">API-Key</label>
-          <input id="apiKey" type="password" autocomplete="off" placeholder="Azure OpenAI API Key" />
-        </div>
-
-        <div class="row">
-          <div class="field">
-            <label for="temperature">Temperature</label>
-            <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.2" />
-          </div>
-          <div class="field">
-            <label for="maxTokens">Max Output Tokens</label>
-            <input id="maxTokens" type="number" min="1" step="1" value="700" />
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="systemPrompt">System Prompt</label>
-          <textarea id="systemPrompt" rows="4">Du bist ein hilfreicher Assistent.</textarea>
-        </div>
-
-        <div class="actions">
-          <button id="saveConfigBtn" type="button">Konfiguration speichern</button>
-          <button id="clearChatBtn" class="secondary" type="button">Chat loeschen</button>
-          <button id="lockBtn" class="secondary" type="button">Sperren</button>
-        </div>
-
-        <p class="hint">Wenn in Confluence kein JavaScript erlaubt ist, diese HTML-Datei extern hosten und per IFrame einbinden.</p>
-      </aside>
-
-      <section class="chat">
-        <h2>Chat</h2>
-        <div id="messages" class="messages"></div>
-
-        <form id="chatForm" class="composer">
-          <textarea id="userInput" placeholder="Nachricht eingeben..." required></textarea>
-          <button id="sendBtn" type="submit">Senden</button>
-        </form>
-
-        <div id="status" class="status"></div>
+        <article class="card">
+          <h2>Topic Registry (lokal + shared)</h2>
+          <div id="topicTableWrap" class="table-wrap"></div>
+        </article>
       </section>
-    </div>
-  </div>
 
-  <script>
-    (function () {
-      var STORAGE_KEY = "azure-openai-prototype-secure-v1";
-      var LEGACY_STORAGE_KEYS = ["azure-openai-prototype-config-v1"];
-      var PBKDF2_ITERATIONS = 250000;
-      var chatHistory = [];
-      var isLoading = false;
-      var sessionPassword = "";
-
-      var el = {
-        lockShell: document.getElementById("lockShell"),
-        appPage: document.getElementById("appPage"),
-        lockDescription: document.getElementById("lockDescription"),
-        unlockPassword: document.getElementById("unlockPassword"),
-        unlockPasswordConfirm: document.getElementById("unlockPasswordConfirm"),
-        confirmWrap: document.getElementById("confirmWrap"),
-        unlockBtn: document.getElementById("unlockBtn"),
-        resetStorageBtn: document.getElementById("resetStorageBtn"),
-        lockStatus: document.getElementById("lockStatus"),
-
-        apiMode: document.getElementById("apiMode"),
-        endpoint: document.getElementById("endpoint"),
-        deployment: document.getElementById("deployment"),
-        apiVersion: document.getElementById("apiVersion"),
-        apiVersionWrap: document.getElementById("apiVersionWrap"),
-        apiKey: document.getElementById("apiKey"),
-        temperature: document.getElementById("temperature"),
-        maxTokens: document.getElementById("maxTokens"),
-        systemPrompt: document.getElementById("systemPrompt"),
-        saveConfigBtn: document.getElementById("saveConfigBtn"),
-        clearChatBtn: document.getElementById("clearChatBtn"),
-        lockBtn: document.getElementById("lockBtn"),
-        chatForm: document.getElementById("chatForm"),
-        userInput: document.getElementById("userInput"),
-        sendBtn: document.getElementById("sendBtn"),
-        messages: document.getElementById("messages"),
-        status: document.getElementById("status")
-      };
-
-      function defaultConfig() {
-        return {
-          apiMode: "v1",
-          endpoint: "",
-          deployment: "",
-          apiVersion: "2024-10-21",
-          apiKey: "",
-          temperature: 0.2,
-          maxTokens: 700,
-          systemPrompt: "Du bist ein hilfreicher Assistent."
-        };
-      }
-
-      function normalizeEndpoint(endpoint) {
-        return endpoint.replace(/\/+$/, "");
-      }
-
-      function setStatus(message, isError) {
-        el.status.textContent = message || "";
-        el.status.className = isError ? "status error" : "status";
-      }
-
-      function setLockStatus(message, isError) {
-        el.lockStatus.textContent = message || "";
-        el.lockStatus.className = isError ? "status error" : "status";
-      }
-
-      function bytesToBase64(bytes) {
-        var binary = "";
-        for (var i = 0; i < bytes.length; i += 1) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        return btoa(binary);
-      }
-
-      function base64ToBytes(base64) {
-        var binary = atob(base64);
-        var bytes = new Uint8Array(binary.length);
-        for (var i = 0; i < binary.length; i += 1) {
-          bytes[i] = binary.charCodeAt(i);
-        }
-        return bytes;
-      }
-
-      async function deriveAesKey(password, saltBytes) {
-        var passwordBytes = new TextEncoder().encode(password);
-        var baseKey = await crypto.subtle.importKey(
-          "raw",
-          passwordBytes,
-          { name: "PBKDF2" },
-          false,
-          ["deriveKey"]
-        );
-
-        return crypto.subtle.deriveKey(
-          {
-            name: "PBKDF2",
-            salt: saltBytes,
-            iterations: PBKDF2_ITERATIONS,
-            hash: "SHA-256"
-          },
-          baseKey,
-          { name: "AES-GCM", length: 256 },
-          false,
-          ["encrypt", "decrypt"]
-        );
-      }
-
-      async function encryptJson(value, password) {
-        var salt = crypto.getRandomValues(new Uint8Array(16));
-        var iv = crypto.getRandomValues(new Uint8Array(12));
-        var key = await deriveAesKey(password, salt);
-        var plaintextBytes = new TextEncoder().encode(JSON.stringify(value));
-
-        var encryptedBuffer = await crypto.subtle.encrypt(
-          { name: "AES-GCM", iv: iv },
-          key,
-          plaintextBytes
-        );
-
-        return {
-          v: 1,
-          salt: bytesToBase64(salt),
-          iv: bytesToBase64(iv),
-          data: bytesToBase64(new Uint8Array(encryptedBuffer))
-        };
-      }
-
-      async function decryptJson(payload, password) {
-        if (!payload || typeof payload !== "object" || !payload.salt || !payload.iv || !payload.data) {
-          throw new Error("Ungueltiges Speicherformat.");
-        }
-
-        var salt = base64ToBytes(payload.salt);
-        var iv = base64ToBytes(payload.iv);
-        var encryptedBytes = base64ToBytes(payload.data);
-        var key = await deriveAesKey(password, salt);
-
-        var decryptedBuffer = await crypto.subtle.decrypt(
-          { name: "AES-GCM", iv: iv },
-          key,
-          encryptedBytes
-        );
-
-        var decryptedText = new TextDecoder().decode(decryptedBuffer);
-        return JSON.parse(decryptedText);
-      }
-
-      function renderMessages() {
-        el.messages.innerHTML = "";
-
-        if (!chatHistory.length) {
-          var empty = document.createElement("div");
-          empty.className = "hint";
-          empty.textContent = "Noch keine Nachrichten. Starte mit einer ersten Frage.";
-          el.messages.appendChild(empty);
-          return;
-        }
-
-        chatHistory.forEach(function (m) {
-          var box = document.createElement("div");
-          box.className = "msg " + (m.role === "assistant" ? "assistant" : "user");
-
-          var role = document.createElement("div");
-          role.className = "role";
-          role.textContent = m.role === "assistant" ? "Assistant" : "User";
-
-          var content = document.createElement("div");
-          content.textContent = m.content;
-
-          box.appendChild(role);
-          box.appendChild(content);
-          el.messages.appendChild(box);
-        });
-
-        el.messages.scrollTop = el.messages.scrollHeight;
-      }
-
-      function updateModeVisibility() {
-        var deploymentMode = el.apiMode.value === "deployment";
-        el.apiVersionWrap.style.display = deploymentMode ? "block" : "none";
-      }
-
-      function getConfig() {
-        return {
-          apiMode: el.apiMode.value,
-          endpoint: el.endpoint.value.trim(),
-          deployment: el.deployment.value.trim(),
-          apiVersion: el.apiVersion.value.trim(),
-          apiKey: el.apiKey.value.trim(),
-          temperature: Number(el.temperature.value),
-          maxTokens: Number(el.maxTokens.value),
-          systemPrompt: el.systemPrompt.value.trim()
-        };
-      }
-
-      function applyConfig(config) {
-        var cfg = config || defaultConfig();
-        el.apiMode.value = cfg.apiMode || "v1";
-        el.endpoint.value = cfg.endpoint || "";
-        el.deployment.value = cfg.deployment || "";
-        el.apiVersion.value = cfg.apiVersion || "2024-10-21";
-        el.apiKey.value = cfg.apiKey || "";
-        el.temperature.value = Number.isFinite(cfg.temperature) ? String(cfg.temperature) : "0.2";
-        el.maxTokens.value = Number.isFinite(cfg.maxTokens) ? String(cfg.maxTokens) : "700";
-        el.systemPrompt.value = cfg.systemPrompt || "Du bist ein hilfreicher Assistent.";
-        updateModeVisibility();
-      }
-
-      function buildStateFromUi() {
-        return {
-          config: getConfig(),
-          chatHistory: chatHistory.slice()
-        };
-      }
-
-      function applyState(state) {
-        var safeState = state || {};
-        applyConfig(safeState.config || defaultConfig());
-        chatHistory = Array.isArray(safeState.chatHistory) ? safeState.chatHistory : [];
-        renderMessages();
-      }
-
-      async function persistEncryptedState() {
-        if (!sessionPassword) {
-          throw new Error("Seite ist gesperrt.");
-        }
-
-        var state = buildStateFromUi();
-        var encrypted = await encryptJson(state, sessionPassword);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(encrypted));
-      }
-
-      function hasStoredState() {
-        return !!localStorage.getItem(STORAGE_KEY);
-      }
-
-      function cleanupLegacyStorage() {
-        LEGACY_STORAGE_KEYS.forEach(function (key) {
-          localStorage.removeItem(key);
-        });
-      }
-
-      function lockApp() {
-        el.appPage.classList.add("hidden");
-        el.lockShell.classList.remove("hidden");
-        el.unlockPassword.value = "";
-        el.unlockPasswordConfirm.value = "";
-        setStatus("", false);
-      }
-
-      function unlockAppWithState(state, password) {
-        sessionPassword = password;
-        applyState(state);
-        el.lockShell.classList.add("hidden");
-        el.appPage.classList.remove("hidden");
-        el.userInput.focus();
-        setStatus("Bereit.", false);
-      }
-
-      function refreshLockUi() {
-        if (hasStoredState()) {
-          el.lockDescription.textContent = "Lokale Daten gefunden. Bitte Passwort eingeben zum Entsperren.";
-          el.confirmWrap.classList.add("hidden");
-          el.unlockBtn.textContent = "Entsperren";
-        } else {
-          el.lockDescription.textContent = "Noch keine lokalen Daten vorhanden. Lege jetzt ein Passwort fest.";
-          el.confirmWrap.classList.remove("hidden");
-          el.unlockBtn.textContent = "Passwort setzen";
-        }
-        setLockStatus("", false);
-      }
-
-      async function handleUnlock() {
-        var password = el.unlockPassword.value;
-        if (!password) {
-          setLockStatus("Bitte Passwort eingeben.", true);
-          return;
-        }
-
-        setLockStatus("Bitte warten...", false);
-
-        try {
-          if (hasStoredState()) {
-            var raw = localStorage.getItem(STORAGE_KEY);
-            var payload = JSON.parse(raw || "{}");
-            var state = await decryptJson(payload, password);
-            unlockAppWithState(state, password);
-            setLockStatus("", false);
-            return;
-          }
-
-          var confirm = el.unlockPasswordConfirm.value;
-          if (password !== confirm) {
-            setLockStatus("Passwoerter stimmen nicht ueberein.", true);
-            return;
-          }
-
-          var initialState = {
-            config: defaultConfig(),
-            chatHistory: []
-          };
-
-          sessionPassword = password;
-          applyState(initialState);
-          await persistEncryptedState();
-          unlockAppWithState(initialState, password);
-          setLockStatus("", false);
-        } catch (err) {
-          sessionPassword = "";
-          setLockStatus("Entsperren fehlgeschlagen: " + (err && err.message ? err.message : String(err)), true);
-        }
-      }
-
-      function validateConfig(config) {
-        if (!config.endpoint) {
-          return "Endpoint fehlt.";
-        }
-        if (!config.deployment) {
-          return "Model/Deployment fehlt.";
-        }
-        if (!config.apiKey) {
-          return "API-Key fehlt.";
-        }
-        if (config.apiMode === "deployment" && !config.apiVersion) {
-          return "API-Version fehlt (Deployment-Modus).";
-        }
-        if (!Number.isFinite(config.temperature) || config.temperature < 0 || config.temperature > 2) {
-          return "Temperature muss zwischen 0 und 2 liegen.";
-        }
-        if (!Number.isFinite(config.maxTokens) || config.maxTokens < 1) {
-          return "Max Output Tokens muss groesser als 0 sein.";
-        }
-        return "";
-      }
-
-      function buildMessages(systemPrompt) {
-        var messages = [];
-
-        if (systemPrompt) {
-          messages.push({ role: "system", content: systemPrompt });
-        }
-
-        chatHistory.forEach(function (m) {
-          messages.push({ role: m.role, content: m.content });
-        });
-
-        return messages;
-      }
-
-      function extractAssistantText(responseJson) {
-        if (responseJson && responseJson.choices && responseJson.choices[0] && responseJson.choices[0].message) {
-          var content = responseJson.choices[0].message.content;
-          if (typeof content === "string") {
-            return content;
-          }
-          if (Array.isArray(content)) {
-            return content.map(function (part) {
-              if (typeof part === "string") {
-                return part;
-              }
-              if (part && typeof part.text === "string") {
-                return part.text;
-              }
-              return "";
-            }).join("\n").trim();
-          }
-        }
-
-        if (typeof responseJson.output_text === "string") {
-          return responseJson.output_text;
-        }
-
-        return JSON.stringify(responseJson, null, 2);
-      }
-
-      function buildRequest(config) {
-        var base = normalizeEndpoint(config.endpoint);
-        var url;
-
-        if (config.apiMode === "v1") {
-          url = base + "/openai/v1/chat/completions";
-        } else {
-          url = base + "/openai/deployments/" + encodeURIComponent(config.deployment) + "/chat/completions?api-version=" + encodeURIComponent(config.apiVersion);
-        }
-
-        return {
-          url: url,
-          headers: {
-            "Content-Type": "application/json",
-            "api-key": config.apiKey
-          }
-        };
-      }
-
-      function buildPayload(config, tokenFieldName) {
-        var payload = {
-          messages: buildMessages(config.systemPrompt),
-          temperature: config.temperature
-        };
-
-        payload[tokenFieldName] = config.maxTokens;
-
-        if (config.apiMode === "v1") {
-          payload.model = config.deployment;
-        }
-
-        return payload;
-      }
-
-      function detectTokenFieldSuggestion(rawError, currentField) {
-        var text = (rawError || "").toLowerCase();
-        var hasUnsupportedHint = text.indexOf("not supported") !== -1 || text.indexOf("unsupported") !== -1;
-        var mentionsMaxTokens = text.indexOf("max_tokens") !== -1;
-        var mentionsMaxCompletionTokens = text.indexOf("max_completion_tokens") !== -1;
-
-        if (!hasUnsupportedHint) {
-          return "";
-        }
-
-        if (currentField === "max_completion_tokens" && mentionsMaxTokens) {
-          return "max_tokens";
-        }
-
-        if (currentField === "max_tokens" && mentionsMaxCompletionTokens) {
-          return "max_completion_tokens";
-        }
-
-        return "";
-      }
-
-      async function postChatCompletion(requestMeta, payload) {
-        var response = await fetch(requestMeta.url, {
-          method: "POST",
-          headers: requestMeta.headers,
-          body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-          return {
-            ok: false,
-            status: response.status,
-            rawError: await response.text()
-          };
-        }
-
-        return {
-          ok: true,
-          data: await response.json()
-        };
-      }
-
-      async function executeWithTokenFallback(config) {
-        var requestMeta = buildRequest(config);
-        var tried = {};
-        var tokenField = "max_completion_tokens";
-        var lastError = "";
-        var lastStatus = 0;
-
-        while (tokenField && !tried[tokenField]) {
-          tried[tokenField] = true;
-
-          var payload = buildPayload(config, tokenField);
-          var result = await postChatCompletion(requestMeta, payload);
-          if (result.ok) {
-            return {
-              data: result.data,
-              tokenField: tokenField
-            };
-          }
-
-          lastError = result.rawError || "";
-          lastStatus = result.status || 0;
-
-          var suggested = detectTokenFieldSuggestion(lastError, tokenField);
-          if (suggested && !tried[suggested]) {
-            tokenField = suggested;
-            continue;
-          }
-
-          break;
-        }
-
-        throw new Error("HTTP " + lastStatus + ": " + lastError);
-      }
-
-      async function sendMessage(userText) {
-        var config = getConfig();
-        var error = validateConfig(config);
-
-        if (error) {
-          setStatus(error, true);
-          return;
-        }
-
-        chatHistory.push({ role: "user", content: userText });
-        renderMessages();
-
-        try {
-          await persistEncryptedState();
-        } catch (persistError) {
-          setStatus("Speichern fehlgeschlagen: " + (persistError && persistError.message ? persistError.message : String(persistError)), true);
-          return;
-        }
-
-        setStatus("Anfrage laeuft...", false);
-
-        try {
-          isLoading = true;
-          el.sendBtn.disabled = true;
-
-          var result = await executeWithTokenFallback(config);
-          var data = result.data;
-          var assistantText = extractAssistantText(data);
-
-          chatHistory.push({ role: "assistant", content: assistantText || "(Keine Ausgabe)" });
-          renderMessages();
-          await persistEncryptedState();
-          setStatus("Antwort erhalten (Token-Feld: " + result.tokenField + ").", false);
-        } catch (err) {
-          var message = err && err.message ? err.message : String(err);
-          if (message && message.toLowerCase().indexOf("failed to fetch") !== -1) {
-            message += " (Hinweis: moeglich sind CORS-Blockade oder Netzwerk/CSP in Confluence.)";
-          }
-          setStatus("Fehler: " + message, true);
-        } finally {
-          isLoading = false;
-          el.sendBtn.disabled = false;
-        }
-      }
-
-      el.apiMode.addEventListener("change", function () {
-        updateModeVisibility();
-      });
-
-      el.saveConfigBtn.addEventListener("click", async function () {
-        try {
-          await persistEncryptedState();
-          setStatus("Konfiguration gespeichert (verschluesselt).", false);
-        } catch (err) {
-          setStatus("Speichern fehlgeschlagen: " + (err && err.message ? err.message : String(err)), true);
-        }
-      });
-
-      el.clearChatBtn.addEventListener("click", async function () {
-        chatHistory = [];
-        renderMessages();
-        try {
-          await persistEncryptedState();
-          setStatus("Chatverlauf geloescht.", false);
-        } catch (err) {
-          setStatus("Speichern fehlgeschlagen: " + (err && err.message ? err.message : String(err)), true);
-        }
-      });
-
-      el.lockBtn.addEventListener("click", function () {
-        sessionPassword = "";
-        lockApp();
-        refreshLockUi();
-      });
-
-      el.chatForm.addEventListener("submit", function (event) {
-        event.preventDefault();
-        if (isLoading) {
-          return;
-        }
-
-        var text = el.userInput.value.trim();
-        if (!text) {
-          return;
-        }
-
-        el.userInput.value = "";
-        sendMessage(text);
-      });
-
-      el.unlockBtn.addEventListener("click", function () {
-        handleUnlock();
-      });
-
-      el.unlockPassword.addEventListener("keydown", function (event) {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          handleUnlock();
-        }
-      });
-
-      el.unlockPasswordConfirm.addEventListener("keydown", function (event) {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          handleUnlock();
-        }
-      });
-
-      el.resetStorageBtn.addEventListener("click", function () {
-        localStorage.removeItem(STORAGE_KEY);
-        sessionPassword = "";
-        chatHistory = [];
-        applyConfig(defaultConfig());
-        renderMessages();
-        refreshLockUi();
-        setLockStatus("Lokale Daten wurden geloescht.", false);
-      });
-
-      applyConfig(defaultConfig());
-      renderMessages();
-      cleanupLegacyStorage();
-      refreshLockUi();
-      lockApp();
-    })();
-  </script>
+      <section id="tab-search" class="tab-panel">
+        <div class="card">
+          <h2>Semantic Search ueber Topic-Registry</h2>
+
+          <div class="grid-3">
+            <div class="field" style="grid-column: span 2;">
+              <label for="searchQuery">Suchanfrage</label>
+              <input id="searchQuery" type="text" placeholder="z. B. Wie teile ich ein zu breites Topic in Subtopics auf?" />
+            </div>
+            <div class="field">
+              <label for="searchTopK">Top K</label>
+              <input id="searchTopK" type="number" min="1" max="20" value="8" />
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button id="rebuildIndexBtn" type="button" class="secondary">Index neu aufbauen</button>
+            <button id="runSearchBtn" type="button">Suche ausfuehren</button>
+          </div>
+
+          <div id="searchStatus" class="status"></div>
+
+          <div id="searchResultList" class="result-list"></div>
+        </div>
+      </section>
+
+      <section id="tab-providers" class="tab-panel">
+        <div class="grid-2">
+          <article class="card">
+            <h2>Provider Switch</h2>
+
+            <div class="field">
+              <label for="activeProvider">Aktiver Provider</label>
+              <select id="activeProvider">
+                <option value="local-browser">local-browser (Default)</option>
+                <option value="azure">azure (optional)</option>
+              </select>
+            </div>
+
+            <h3>Local Browser Provider</h3>
+            <div class="field">
+              <label for="localChatModel">Chat Modell (Transformers.js)</label>
+              <input id="localChatModel" type="text" value="Xenova/mt5-small" />
+            </div>
+            <div class="field">
+              <label for="localEmbeddingModel">Embedding Modell (de/multilingual)</label>
+              <input id="localEmbeddingModel" type="text" value="Xenova/paraphrase-multilingual-MiniLM-L12-v2" />
+            </div>
+
+            <h3>Azure Provider</h3>
+            <div class="field">
+              <label for="azureApiMode">API Modus</label>
+              <select id="azureApiMode">
+                <option value="v1">v1 endpoints</option>
+                <option value="deployment">deployment endpoints</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="azureEndpoint">Endpoint</label>
+              <input id="azureEndpoint" type="url" placeholder="https://resource.openai.azure.com" />
+            </div>
+            <div class="grid-3">
+              <div class="field">
+                <label for="azureChatModel">Chat Model/Deployment</label>
+                <input id="azureChatModel" type="text" placeholder="gpt-5.1-mini oder deployment" />
+              </div>
+              <div class="field">
+                <label for="azureEmbeddingModel">Embedding Model/Deployment</label>
+                <input id="azureEmbeddingModel" type="text" placeholder="text-embedding-3-large" />
+              </div>
+              <div class="field">
+                <label for="azureApiVersion">API Version</label>
+                <input id="azureApiVersion" type="text" value="2024-10-21" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="azureApiKey">API Key</label>
+              <input id="azureApiKey" type="password" autocomplete="off" />
+            </div>
+
+            <div class="btn-row">
+              <button id="saveProviderBtn" type="button">Provider speichern</button>
+              <button id="checkProviderHealthBtn" type="button" class="secondary">Provider Health Check</button>
+            </div>
+            <div id="providerStatus" class="status"></div>
+          </article>
+
+          <article class="card">
+            <h2>Capabilities</h2>
+            <div id="providerCapabilityBox" class="quality-box"></div>
+            <p class="small">Der aktive Provider muss Generation und Embeddings fuer Topic-Bewertung sowie Retrieval liefern.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="tab-confluence" class="tab-panel">
+        <div class="grid-2">
+          <article class="card">
+            <h2>Confluence Registry Konfiguration</h2>
+
+            <div class="field">
+              <label for="confBaseUrl">Confluence Base URL</label>
+              <input id="confBaseUrl" type="url" placeholder="https://your-org.atlassian.net/wiki" />
+            </div>
+
+            <div class="grid-3">
+              <div class="field">
+                <label for="confRootPageId">Root Page ID</label>
+                <input id="confRootPageId" type="text" placeholder="123456" />
+              </div>
+              <div class="field">
+                <label for="confAuthMode">Auth Mode</label>
+                <select id="confAuthMode">
+                  <option value="basic">basic (email + api token)</option>
+                  <option value="bearer">bearer PAT</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="confTimeoutMs">Timeout (ms)</label>
+                <input id="confTimeoutMs" type="number" min="1000" step="1000" value="20000" />
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div class="field" id="confEmailWrap">
+                <label for="confEmail">Email</label>
+                <input id="confEmail" type="email" autocomplete="off" />
+              </div>
+              <div class="field" id="confApiTokenWrap">
+                <label for="confApiToken">API Token</label>
+                <input id="confApiToken" type="password" autocomplete="off" />
+              </div>
+            </div>
+
+            <div class="field hidden" id="confPatWrap">
+              <label for="confPat">Bearer PAT</label>
+              <input id="confPat" type="password" autocomplete="off" />
+            </div>
+
+            <div class="btn-row">
+              <button id="saveConfluenceBtn" type="button">Confluence Config speichern</button>
+              <button id="testConfluenceBtn" type="button" class="secondary">Verbindung testen</button>
+              <button id="importTopicsBtn" type="button" class="secondary">Topics importieren</button>
+              <button id="syncAllTopicsBtn" type="button">Alle Topics syncen</button>
+            </div>
+            <div id="confluenceStatus" class="status"></div>
+          </article>
+
+          <article class="card">
+            <h2>Sync Log</h2>
+            <div id="syncLog" class="log-box"></div>
+          </article>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="./src/app.js"></script>
 </body>
 </html>
