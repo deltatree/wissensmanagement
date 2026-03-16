@@ -2,6 +2,7 @@ import {
   assessGranularityHeuristic,
   buildTopicChunks,
   createEmptyTopic,
+  detectTopicOverlaps,
   normalizeTopicInput,
   parseTags,
   validateTopic
@@ -19,6 +20,8 @@ let state = createDefaultState();
 let sessionPassword = "";
 let selectedTopicId = "";
 let qualityPreview = null;
+let sourceCandidates = [];
+let selectedSourceRefs = [];
 
 const providerManager = new ProviderManager(() => state);
 const confluenceService = new ConfluenceService(() => state.confluence);
@@ -75,6 +78,14 @@ function resolveElements() {
     topicSummary: document.getElementById("topicSummary"),
     topicScopeNotes: document.getElementById("topicScopeNotes"),
     topicSourcePageId: document.getElementById("topicSourcePageId"),
+    sourceTagQuery: document.getElementById("sourceTagQuery"),
+    loadSourcePagesBtn: document.getElementById("loadSourcePagesBtn"),
+    deriveTopicFieldsBtn: document.getElementById("deriveTopicFieldsBtn"),
+    sourcePageStatus: document.getElementById("sourcePageStatus"),
+    sourceCandidateList: document.getElementById("sourceCandidateList"),
+    topicDistinctionNotes: document.getElementById("topicDistinctionNotes"),
+    mergeTargetTopic: document.getElementById("mergeTargetTopic"),
+    mergeTopicBtn: document.getElementById("mergeTopicBtn"),
     topicParent: document.getElementById("topicParent"),
     topicTags: document.getElementById("topicTags"),
     newTopicBtn: document.getElementById("newTopicBtn"),
@@ -141,6 +152,14 @@ function validateElements() {
     "topicSummary",
     "topicScopeNotes",
     "topicSourcePageId",
+    "sourceTagQuery",
+    "loadSourcePagesBtn",
+    "deriveTopicFieldsBtn",
+    "sourcePageStatus",
+    "sourceCandidateList",
+    "topicDistinctionNotes",
+    "mergeTargetTopic",
+    "mergeTopicBtn",
     "topicParent",
     "topicTags",
     "newTopicBtn",
@@ -210,6 +229,97 @@ function topicById(topicId) {
   return state.topics.find((topic) => topic.id === topicId) || null;
 }
 
+function normalizeSourceRef(ref) {
+  return {
+    pageId: String(ref?.pageId || ref?.id || "").trim(),
+    title: String(ref?.title || "").trim(),
+    url: String(ref?.url || "").trim(),
+    tags: Array.isArray(ref?.tags) ? ref.tags.map((tag) => String(tag).trim()).filter(Boolean) : []
+  };
+}
+
+function dedupeSourceRefs(refs) {
+  const byId = new Map();
+  for (const raw of refs || []) {
+    const ref = normalizeSourceRef(raw);
+    if (!ref.pageId) {
+      continue;
+    }
+    if (!byId.has(ref.pageId)) {
+      byId.set(ref.pageId, ref);
+      continue;
+    }
+    const existing = byId.get(ref.pageId);
+    byId.set(ref.pageId, {
+      ...existing,
+      title: existing.title || ref.title,
+      url: existing.url || ref.url,
+      tags: Array.from(new Set([...(existing.tags || []), ...(ref.tags || [])])).filter(Boolean)
+    });
+  }
+  return Array.from(byId.values());
+}
+
+function syncPrimarySourceField() {
+  el.topicSourcePageId.value = selectedSourceRefs.length ? selectedSourceRefs[0].pageId : "";
+}
+
+function renderSourceCandidates() {
+  const list = sourceCandidates.length ? sourceCandidates : selectedSourceRefs;
+  if (!list.length) {
+    el.sourceCandidateList.innerHTML = '<div class="small">Keine Quellseiten geladen.</div>';
+    syncPrimarySourceField();
+    return;
+  }
+
+  const selectedIds = new Set(selectedSourceRefs.map((ref) => ref.pageId));
+  el.sourceCandidateList.innerHTML = list
+    .map((ref) => {
+      const checked = selectedIds.has(ref.pageId) ? "checked" : "";
+      const tags = (ref.tags || []).map((tag) => `<span class="pill">${escapeHtml(tag)}</span>`).join("");
+      return `
+        <label class="result-item" style="display:block; cursor:pointer;">
+          <input type="checkbox" data-source-page-id="${escapeHtml(ref.pageId)}" ${checked} />
+          <strong>${escapeHtml(ref.title || ref.pageId)}</strong>
+          <div class="small">Page ID: ${escapeHtml(ref.pageId)}</div>
+          ${ref.url ? `<div class="small"><a href="${escapeHtml(ref.url)}" target="_blank" rel="noreferrer">Seite oeffnen</a></div>` : ""}
+          ${tags ? `<div style="margin-top:6px;">${tags}</div>` : ""}
+        </label>
+      `;
+    })
+    .join("\n");
+
+  syncPrimarySourceField();
+}
+
+function updateSelectedSourceRefsFromCheckboxes() {
+  const displayedRefs = sourceCandidates.length ? sourceCandidates : selectedSourceRefs;
+  const selectedIds = new Set(
+    Array.from(el.sourceCandidateList.querySelectorAll('input[type="checkbox"][data-source-page-id]:checked')).map(
+      (node) => String(node.getAttribute("data-source-page-id") || "").trim()
+    )
+  );
+
+  const merged = dedupeSourceRefs([
+    ...selectedSourceRefs.filter((ref) => selectedIds.has(ref.pageId)),
+    ...displayedRefs.filter((ref) => selectedIds.has(ref.pageId))
+  ]);
+  selectedSourceRefs = merged;
+  syncPrimarySourceField();
+}
+
+function renderMergeTargetOptions(overlapCandidates = []) {
+  const options = ['<option value="">(kein Merge)</option>'];
+  const overlapSet = new Set((overlapCandidates || []).map((item) => item.topicId));
+  const fallback = state.topics.filter((topic) => topic.id !== selectedTopicId);
+
+  for (const topic of fallback) {
+    const marker = overlapSet.has(topic.id) ? " (aehnlich)" : "";
+    options.push(`<option value="${escapeHtml(topic.id)}">${escapeHtml(topic.title)}${marker}</option>`);
+  }
+  el.mergeTargetTopic.innerHTML = options.join("");
+}
+
 function setStatus(target, message, type = "info") {
   if (!target) {
     return;
@@ -275,8 +385,11 @@ async function handleUnlock() {
   try {
     if (store.hasAnyState()) {
       state = mergeWithDefaults(await store.load(password));
+      state.topics = Array.isArray(state.topics) ? state.topics.map((topic) => normalizeTopicInput(topic)) : [];
       // Local-browser stays the default startup provider.
       state.settings.activeProvider = "local-browser";
+      sourceCandidates = [];
+      selectedSourceRefs = [];
       sessionPassword = password;
       unlockApp();
       setStatus(el.lockStatus, "", "info");
@@ -290,6 +403,8 @@ async function handleUnlock() {
     }
 
     state = createDefaultState();
+    sourceCandidates = [];
+    selectedSourceRefs = [];
     sessionPassword = password;
     await persistState();
     unlockApp();
@@ -360,7 +475,8 @@ function topicToRow(topic) {
     <tr>
       <td>
         <strong>${escapeHtml(topic.title)}</strong><br />
-        <span class="small">${escapeHtml(topic.id)}</span>
+        <span class="small">${escapeHtml(topic.id)}</span><br />
+        <span class="small">Sources: ${Array.isArray(topic.sourceRefs) && topic.sourceRefs.length ? topic.sourceRefs.length : topic.sourcePageId ? 1 : 0}</span>
       </td>
       <td>
         ${topic.tags.map((tag) => `<span class="pill">${escapeHtml(tag)}</span>`).join("")}
@@ -421,12 +537,18 @@ function renderParentSelect() {
 }
 
 function readTopicFromForm() {
+  const sourceTags = parseTags(el.sourceTagQuery.value);
+  const sourceRefs = dedupeSourceRefs(selectedSourceRefs);
+
   const topic = normalizeTopicInput({
     id: selectedTopicId || createEmptyTopic().id,
     title: el.topicTitle.value,
     summary: el.topicSummary.value,
     scopeNotes: el.topicScopeNotes.value,
-    sourcePageId: el.topicSourcePageId.value,
+    sourcePageId: sourceRefs.length ? sourceRefs[0].pageId : el.topicSourcePageId.value,
+    sourceRefs,
+    sourceTags,
+    distinctionNotes: el.topicDistinctionNotes.value,
     parentTopicId: el.topicParent.value,
     tags: parseTags(el.topicTags.value)
   });
@@ -447,16 +569,26 @@ function fillTopicForm(topic) {
   el.topicTitle.value = topic.title;
   el.topicSummary.value = topic.summary;
   el.topicScopeNotes.value = topic.scopeNotes;
+  selectedSourceRefs = dedupeSourceRefs(topic.sourceRefs || []);
+  if (!selectedSourceRefs.length && topic.sourcePageId) {
+    selectedSourceRefs = [{ pageId: topic.sourcePageId, title: `Source ${topic.sourcePageId}`, url: "", tags: [] }];
+  }
   el.topicSourcePageId.value = topic.sourcePageId;
+  el.sourceTagQuery.value = (topic.sourceTags || []).join(", ");
+  el.topicDistinctionNotes.value = topic.distinctionNotes || "";
   el.topicTags.value = (topic.tags || []).join(", ");
   renderParentSelect();
   el.topicParent.value = topic.parentTopicId || "";
+  renderSourceCandidates();
+  renderMergeTargetOptions(topic.quality?.overlapCandidates || []);
   renderQualityBox();
 }
 
 function clearTopicForm() {
   selectedTopicId = "";
   qualityPreview = null;
+  sourceCandidates = [];
+  selectedSourceRefs = [];
   const empty = createEmptyTopic();
   fillTopicForm(empty);
   setStatus(el.topicFormStatus, "Neues Topic gestartet.", "info");
@@ -492,6 +624,7 @@ function renderQualityBox() {
 
   if (!quality) {
     el.qualityBox.innerHTML = '<div class="small">Noch keine Bewertung vorhanden.</div>';
+    renderMergeTargetOptions([]);
     return;
   }
 
@@ -511,6 +644,7 @@ function renderQualityBox() {
     <h4>Ueberschneidungen</h4>
     ${overlaps ? `<ul>${overlaps}</ul>` : '<div class="small">Keine signifikanten Overlaps</div>'}
   `;
+  renderMergeTargetOptions(quality.overlapCandidates || []);
 }
 
 function renderSearchResults(results) {
@@ -562,6 +696,8 @@ function renderAll() {
   renderConfluenceForm();
   renderParentSelect();
   renderTopicTable();
+  renderSourceCandidates();
+  renderMergeTargetOptions(qualityPreview?.overlapCandidates || []);
   renderQualityBox();
   renderProviderCapabilities();
 }
@@ -593,6 +729,175 @@ function parseAssessmentJson(text) {
   }
 }
 
+function parseJsonObjectFromText(text) {
+  const raw = String(text || "");
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(match[0]);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function fallbackDerivedTopicFields(sourceSummaries, sourceTags) {
+  const first = sourceSummaries[0] || { title: "", excerpt: "" };
+  const mergedTags = Array.from(new Set([...(sourceTags || []), ...(first.tags || [])]));
+  return {
+    title: first.title || "Neues Topic aus Quellseiten",
+    summary: (first.excerpt || "").slice(0, 220) || "Automatisch aus Quellseiten abgeleitet.",
+    scopeNotes: sourceSummaries
+      .map((item) => `${item.title}: ${(item.excerpt || "").slice(0, 140)}`)
+      .slice(0, 4)
+      .join("\n"),
+    tags: mergedTags,
+    distinctionNotes: ""
+  };
+}
+
+async function loadSourceCandidates() {
+  readConfluenceFormToState();
+  const tags = parseTags(el.sourceTagQuery.value);
+  setStatus(el.sourcePageStatus, "Lade Quellseiten...", "info");
+
+  try {
+    const pages = await confluenceService.listSourcePagesByTags(tags);
+    sourceCandidates = dedupeSourceRefs(
+      pages.map((page) => ({
+        pageId: page.pageId,
+        title: page.title,
+        url: page.url,
+        tags: page.tags || []
+      }))
+    );
+
+    const selectedIds = new Set(selectedSourceRefs.map((ref) => ref.pageId));
+    selectedSourceRefs = dedupeSourceRefs([
+      ...selectedSourceRefs.filter((ref) => selectedIds.has(ref.pageId)),
+      ...sourceCandidates.filter((ref) => selectedIds.has(ref.pageId))
+    ]);
+
+    renderSourceCandidates();
+    setStatus(el.sourcePageStatus, `${sourceCandidates.length} Quellseiten geladen.`, "ok");
+  } catch (error) {
+    setStatus(el.sourcePageStatus, `Quellseiten konnten nicht geladen werden: ${error.message}`, "error");
+  }
+}
+
+async function deriveTopicFieldsFromSources() {
+  readConfluenceFormToState();
+  const refs = dedupeSourceRefs(selectedSourceRefs);
+  if (!refs.length) {
+    setStatus(el.topicFormStatus, "Bitte zuerst Quellseiten auswaehlen.", "error");
+    return;
+  }
+
+  setStatus(el.topicFormStatus, "Leite Felder per KI aus Quellseiten ab...", "info");
+
+  try {
+    const sourceTags = parseTags(el.sourceTagQuery.value);
+    const summaries = await confluenceService.getSourcePageSummaries(refs.map((ref) => ref.pageId));
+    const provider = providerManager.getActiveProvider();
+
+    const prompt = [
+      "Erzeuge ein fokussiertes deutsches Wissens-Topic aus den folgenden Confluence-Quellseiten.",
+      "Antwort strikt als JSON mit: title, summary, scopeNotes, tags[], distinctionNotes.",
+      "Wenn Inhalte sehr aehnlich zu bestehenden Topics sein koennten, distinctionNotes klar formulieren.",
+      "Quellseiten:",
+      JSON.stringify(summaries, null, 2),
+      "Tags-Filter:",
+      JSON.stringify(sourceTags)
+    ].join("\n");
+
+    const response = await provider.generate({
+      systemPrompt: "Du bist Informationsarchitekt fuer fachlich saubere Topic-Grenzen in deutscher Sprache.",
+      userPrompt: prompt,
+      maxTokens: 500,
+      temperature: 0.15
+    });
+
+    const parsed = parseJsonObjectFromText(response);
+    const fallback = fallbackDerivedTopicFields(summaries, sourceTags);
+    const result = {
+      ...fallback,
+      ...(parsed || {})
+    };
+
+    el.topicTitle.value = String(result.title || fallback.title).trim();
+    el.topicSummary.value = String(result.summary || fallback.summary).trim();
+    el.topicScopeNotes.value = String(result.scopeNotes || fallback.scopeNotes).trim();
+    el.topicTags.value = Array.isArray(result.tags) ? result.tags.map((x) => String(x)).join(", ") : fallback.tags.join(", ");
+    el.topicDistinctionNotes.value = String(result.distinctionNotes || "").trim();
+
+    setStatus(el.topicFormStatus, "Topic-Felder wurden aus Quellseiten abgeleitet.", "ok");
+  } catch (error) {
+    setStatus(el.topicFormStatus, `KI-Ableitung fehlgeschlagen: ${error.message}`, "error");
+  }
+}
+
+function mergeTopics(targetTopic, sourceTopic) {
+  const sourceRefs = dedupeSourceRefs([...(targetTopic.sourceRefs || []), ...(sourceTopic.sourceRefs || [])]);
+  const tags = Array.from(new Set([...(targetTopic.tags || []), ...(sourceTopic.tags || [])])).filter(Boolean);
+  const sourceTags = Array.from(new Set([...(targetTopic.sourceTags || []), ...(sourceTopic.sourceTags || [])])).filter(Boolean);
+  const distinctionParts = [targetTopic.distinctionNotes, sourceTopic.distinctionNotes]
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+
+  return normalizeTopicInput({
+    ...targetTopic,
+    summary: [targetTopic.summary, sourceTopic.summary].map((x) => String(x || "").trim()).filter(Boolean).join("\n\n"),
+    scopeNotes: [targetTopic.scopeNotes, sourceTopic.scopeNotes].map((x) => String(x || "").trim()).filter(Boolean).join("\n\n"),
+    tags,
+    sourceTags,
+    sourceRefs,
+    sourcePageId: sourceRefs.length ? sourceRefs[0].pageId : targetTopic.sourcePageId,
+    distinctionNotes: distinctionParts.join("\n")
+  });
+}
+
+async function mergeCurrentTopicIntoTarget() {
+  if (!selectedTopicId) {
+    setStatus(el.topicFormStatus, "Bitte zuerst ein Topic waehlen.", "error");
+    return;
+  }
+
+  const sourceTopic = topicById(selectedTopicId);
+  if (!sourceTopic) {
+    setStatus(el.topicFormStatus, "Ausgewaehltes Topic nicht gefunden.", "error");
+    return;
+  }
+
+  const targetId = String(el.mergeTargetTopic.value || "").trim();
+  if (!targetId) {
+    setStatus(el.topicFormStatus, "Bitte Zieltopic fuer den Merge auswaehlen.", "error");
+    return;
+  }
+
+  const targetTopic = topicById(targetId);
+  if (!targetTopic) {
+    setStatus(el.topicFormStatus, "Zieltopic nicht gefunden.", "error");
+    return;
+  }
+
+  const merged = mergeTopics(targetTopic, sourceTopic);
+  upsertTopic(merged);
+  removeTopic(sourceTopic.id);
+  selectedTopicId = merged.id;
+  qualityPreview = assessGranularityHeuristic(merged, state.topics);
+
+  try {
+    await persistState();
+    renderAll();
+    fillTopicForm(merged);
+    setStatus(el.topicFormStatus, `Topics zusammengefuehrt: '${sourceTopic.title}' -> '${targetTopic.title}'.`, "ok");
+  } catch (error) {
+    setStatus(el.topicFormStatus, `Merge fehlgeschlagen: ${error.message}`, "error");
+  }
+}
+
 async function assessCurrentTopic() {
   const candidate = readTopicFromForm();
   const heuristic = assessGranularityHeuristic(candidate, state.topics);
@@ -610,6 +915,8 @@ async function assessCurrentTopic() {
           title: candidate.title,
           summary: candidate.summary,
           scopeNotes: candidate.scopeNotes,
+          distinctionNotes: candidate.distinctionNotes,
+          sourceRefs: candidate.sourceRefs,
           tags: candidate.tags,
           parentTopicId: candidate.parentTopicId
         },
@@ -655,6 +962,20 @@ async function saveCurrentTopic() {
   const validation = validateTopic(topic);
   if (!validation.valid) {
     setStatus(el.topicFormStatus, validation.errors.join(" "), "error");
+    return;
+  }
+
+  const overlaps = detectTopicOverlaps(topic, state.topics);
+  const topOverlap = overlaps[0];
+  if (topOverlap && topOverlap.lexicalScore >= 0.82 && String(topic.distinctionNotes || "").trim().length < 30) {
+    setStatus(
+      el.topicFormStatus,
+      `Topic ist ${(topOverlap.lexicalScore * 100).toFixed(
+        1
+      )}% aehnlich zu '${topOverlap.title}'. Bitte zusammenfassen oder fachliche Abgrenzung klar beschreiben.`,
+      "error"
+    );
+    renderMergeTargetOptions(overlaps);
     return;
   }
 
@@ -944,6 +1265,8 @@ function bindEvents() {
     state = createDefaultState();
     selectedTopicId = "";
     qualityPreview = null;
+    sourceCandidates = [];
+    selectedSourceRefs = [];
     setStatus(el.lockStatus, "Lokale Daten wurden geloescht.", "ok");
     refreshLockUi();
   });
@@ -964,6 +1287,29 @@ function bindEvents() {
 
   el.newTopicBtn.addEventListener("click", () => {
     clearTopicForm();
+  });
+
+  el.loadSourcePagesBtn.addEventListener("click", () => {
+    loadSourceCandidates();
+  });
+
+  el.sourceTagQuery.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      loadSourceCandidates();
+    }
+  });
+
+  el.deriveTopicFieldsBtn.addEventListener("click", () => {
+    deriveTopicFieldsFromSources();
+  });
+
+  el.sourceCandidateList.addEventListener("change", () => {
+    updateSelectedSourceRefsFromCheckboxes();
+  });
+
+  el.mergeTopicBtn.addEventListener("click", () => {
+    mergeCurrentTopicIntoTarget();
   });
 
   el.assessTopicBtn.addEventListener("click", () => {

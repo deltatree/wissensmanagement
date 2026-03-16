@@ -92,6 +92,50 @@ function buildTopicPageBody(topic) {
   ].join("\n");
 }
 
+function buildConfluenceTopicPageTitle(topic) {
+  const base = String(topic.title || "").trim() || "Untitled Topic";
+  const uuid = String(topic.id || "").trim();
+  if (!uuid) {
+    return base;
+  }
+  return `${base} [${uuid}]`;
+}
+
+function stripHtml(html) {
+  return String(html || "")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function pageTags(page) {
+  return Array.isArray(page?.metadata?.labels?.results)
+    ? page.metadata.labels.results.map((item) => String(item?.name || "").trim()).filter(Boolean)
+    : [];
+}
+
+function pageUrl(config, page) {
+  const webui = String(page?._links?.webui || "").trim();
+  if (!webui) {
+    return `${config.baseUrl}/pages/${page.id}`;
+  }
+  if (/^https?:\/\//i.test(webui)) {
+    return webui;
+  }
+
+  const originMatch = String(config.baseUrl).match(/^https?:\/\/[^/]+/i);
+  const origin = originMatch ? originMatch[0] : "";
+  return `${origin}${webui}`;
+}
+
 function parseMetadataFromStorageHtml(storageValue) {
   const raw = String(storageValue || "");
   const match = raw.match(/<pre\s+data-km-topic-metadata=\"true\">([\s\S]*?)<\/pre>/i);
@@ -216,6 +260,69 @@ export class ConfluenceService {
       .filter(Boolean);
   }
 
+  async listSourcePagesByTags(tagFilter = []) {
+    const config = this.config();
+    this.assertRequired(config);
+
+    const tags = Array.isArray(tagFilter)
+      ? tagFilter.map((tag) => String(tag || "").trim()).filter(Boolean)
+      : [];
+
+    const currentPath = typeof window === "undefined" ? "" : String(window.location?.pathname || "");
+    const currentPageMatch = currentPath.match(/\/pages\/(\d+)/);
+    const defaultPageId = currentPageMatch?.[1] || String(config.rootPageId);
+
+    if (!tags.length) {
+      const page = await this.request(`/rest/api/content/${encodeURIComponent(defaultPageId)}?expand=metadata.labels`);
+      return [
+        {
+          pageId: String(page.id),
+          title: String(page.title || ""),
+          url: pageUrl(config, page),
+          tags: pageTags(page)
+        }
+      ];
+    }
+
+    const cql = [`ancestor=${config.rootPageId}`, ...tags.map((tag) => `label="${tag.replace(/"/g, '\\"')}"`)].join(" AND ");
+    const data = await this.request(
+      `/rest/api/content/search?cql=${encodeURIComponent(cql)}&limit=200&expand=metadata.labels`
+    );
+
+    const results = Array.isArray(data.results) ? data.results : [];
+    return results.map((page) => ({
+      pageId: String(page.id),
+      title: String(page.title || ""),
+      url: pageUrl(config, page),
+      tags: pageTags(page)
+    }));
+  }
+
+  async getSourcePageSummaries(pageIds = []) {
+    const config = this.config();
+    this.assertRequired(config);
+
+    const ids = Array.from(new Set((pageIds || []).map((id) => String(id || "").trim()).filter(Boolean)));
+    const summaries = [];
+
+    for (const pageId of ids) {
+      const page = await this.request(
+        `/rest/api/content/${encodeURIComponent(pageId)}?expand=body.storage,metadata.labels`
+      );
+
+      const text = stripHtml(page?.body?.storage?.value || "");
+      summaries.push({
+        pageId: String(page.id),
+        title: String(page.title || ""),
+        url: pageUrl(config, page),
+        tags: pageTags(page),
+        excerpt: text.slice(0, 2000)
+      });
+    }
+
+    return summaries;
+  }
+
   async upsertTopic(topic) {
     const config = this.config();
     this.assertRequired(config);
@@ -234,7 +341,7 @@ export class ConfluenceService {
         method: "POST",
         body: JSON.stringify({
           type: "page",
-          title: normalizedTopic.title,
+          title: buildConfluenceTopicPageTitle(normalizedTopic),
           ancestors: [{ id: String(config.rootPageId) }],
           space: { key: spaceKey },
           body: {
@@ -264,7 +371,7 @@ export class ConfluenceService {
       body: JSON.stringify({
         id: normalizedTopic.landingPageId,
         type: "page",
-        title: normalizedTopic.title,
+        title: buildConfluenceTopicPageTitle(normalizedTopic),
         space: { key: spaceKey },
         body: {
           storage: {

@@ -8,12 +8,16 @@ Die Anwendung ist jetzt ein durchgaengiger vertikaler Slice fuer kollaboratives 
 
 - Topic-zentriertes Modell mit Parent/Child-Hierarchie
 - Granularitaetsbewertung inkl. Split-Empfehlungen
+- Tag-basiertes Quellseiten-Scoping (leer = aktuelle Seite) und Quellseitenauswahl
+- KI-gestuetzte Ableitung von Titel, Summary, Scope und Tags aus gewaehlten Quellseiten
+- Similarity-Governance: Merge moeglich oder fachliche Abgrenzung verpflichtend bei hoher Aehnlichkeit
 - Confluence als Shared Registry (Import + Sync von Topic-Subpages)
 - Semantic Search ueber Topic-Chunks mit nachvollziehbarem Kontext
 - Provider-Abstraktion:
   - `local-browser` als Default
   - `azure` als optionale Alternative
 - Passwort-geschuetzter, lokal verschluesselter Zustand
+- UUID-basierte Confluence-Seitentitel fuer konfliktfreie Speicherung
 
 ## Projektstruktur
 

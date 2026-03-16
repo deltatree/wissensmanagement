@@ -592,8 +592,8 @@
 
             <div class="grid-3">
               <div class="field">
-                <label for="topicSourcePageId">Confluence Source Page ID</label>
-                <input id="topicSourcePageId" type="text" placeholder="123456" />
+                <label for="topicSourcePageId">Primaere Source Page ID</label>
+                <input id="topicSourcePageId" type="text" placeholder="wird aus Quellseiten-Auswahl gesetzt" readonly />
               </div>
               <div class="field">
                 <label for="topicParent">Parent Topic</label>
@@ -602,6 +602,33 @@
               <div class="field">
                 <label for="topicTags">Tags (kommagetrennt)</label>
                 <input id="topicTags" type="text" placeholder="confluence,rag,governance" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="sourceTagQuery">Quellseiten-Filter per Tag (kommagetrennt, leer = aktuelle Seite)</label>
+              <input id="sourceTagQuery" type="text" placeholder="z. B. kredit,governance" />
+            </div>
+            <div class="btn-row">
+              <button id="loadSourcePagesBtn" type="button" class="secondary">Quellseiten laden</button>
+              <button id="deriveTopicFieldsBtn" type="button" class="warn">Felder per KI ableiten</button>
+            </div>
+            <div id="sourcePageStatus" class="status"></div>
+            <div id="sourceCandidateList" class="result-list"></div>
+
+            <div class="field">
+              <label for="topicDistinctionNotes">Abgrenzung zu aehnlichen Topics (Pflicht bei hoher Aehnlichkeit)</label>
+              <textarea id="topicDistinctionNotes" placeholder="Beschreibe fachlich klar den Unterschied oder den Merge-Entscheid."></textarea>
+            </div>
+
+            <div class="grid-2">
+              <div class="field">
+                <label for="mergeTargetTopic">Aehnliches Topic zusammenfassen in</label>
+                <select id="mergeTargetTopic"></select>
+              </div>
+              <div class="field">
+                <label for="mergeTopicBtn">Merge</label>
+                <button id="mergeTopicBtn" type="button" class="secondary">Mit Zieltopic zusammenfassen</button>
               </div>
             </div>
 

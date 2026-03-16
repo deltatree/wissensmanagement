@@ -2,7 +2,9 @@ function randomTopicId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
   }
-  return `topic-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+  const seed = `${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+  const hex = simpleHash(seed).replace(/^h/, "").padStart(8, "0");
+  return `${hex.slice(0, 8)}-${hex.slice(0, 4)}-4${hex.slice(4, 7)}-a${hex.slice(1, 4)}-${hex}${hex.slice(0, 4)}`;
 }
 
 function tokenize(text) {
@@ -69,6 +71,9 @@ export function createEmptyTopic() {
     scopeNotes: "",
     parentTopicId: "",
     sourcePageId: "",
+    sourceRefs: [],
+    sourceTags: [],
+    distinctionNotes: "",
     landingPageId: "",
     landingPageUrl: "",
     tags: [],
@@ -103,9 +108,25 @@ export function normalizeTopicInput(input) {
   topic.scopeNotes = String(topic.scopeNotes || "").trim();
   topic.parentTopicId = String(topic.parentTopicId || "").trim();
   topic.sourcePageId = String(topic.sourcePageId || "").trim();
+  topic.sourceTags = Array.isArray(topic.sourceTags) ? topic.sourceTags.map((x) => String(x).trim()).filter(Boolean) : [];
+  topic.sourceRefs = Array.isArray(topic.sourceRefs)
+    ? topic.sourceRefs
+        .map((ref) => ({
+          pageId: String(ref?.pageId || ref?.id || "").trim(),
+          title: String(ref?.title || "").trim(),
+          url: String(ref?.url || "").trim(),
+          tags: Array.isArray(ref?.tags) ? ref.tags.map((tag) => String(tag).trim()).filter(Boolean) : []
+        }))
+        .filter((ref) => ref.pageId)
+    : [];
+  topic.distinctionNotes = String(topic.distinctionNotes || "").trim();
   topic.landingPageId = String(topic.landingPageId || "").trim();
   topic.landingPageUrl = String(topic.landingPageUrl || "").trim();
   topic.tags = Array.isArray(topic.tags) ? topic.tags.map((x) => String(x).trim()).filter(Boolean) : [];
+
+  if (!topic.sourcePageId && topic.sourceRefs.length) {
+    topic.sourcePageId = topic.sourceRefs[0].pageId;
+  }
 
   if (!topic.id) {
     topic.id = randomTopicId();
@@ -131,7 +152,8 @@ export function validateTopic(topic) {
     errors.push("Summary ist zu kurz (mind. 20 Zeichen).");
   }
 
-  if (!topic.sourcePageId) {
+  const hasSourceRefs = Array.isArray(topic.sourceRefs) && topic.sourceRefs.length > 0;
+  if (!topic.sourcePageId && !hasSourceRefs) {
     errors.push("Confluence Source Page ID ist erforderlich.");
   }
 
@@ -146,7 +168,12 @@ export function validateTopic(topic) {
 }
 
 export function detectTopicOverlaps(topic, allTopics) {
-  const sourceTokens = tokenize(`${topic.title} ${topic.summary} ${topic.scopeNotes} ${topic.tags.join(" ")}`);
+  const sourceRefTokens = (topic.sourceRefs || [])
+    .map((ref) => `${ref.title} ${(ref.tags || []).join(" ")}`)
+    .join(" ");
+  const sourceTokens = tokenize(
+    `${topic.title} ${topic.summary} ${topic.scopeNotes} ${topic.distinctionNotes || ""} ${topic.tags.join(" ")} ${sourceRefTokens}`
+  );
   const overlaps = [];
 
   for (const candidate of allTopics || []) {
@@ -155,7 +182,9 @@ export function detectTopicOverlaps(topic, allTopics) {
     }
 
     const candidateTokens = tokenize(
-      `${candidate.title} ${candidate.summary} ${candidate.scopeNotes} ${(candidate.tags || []).join(" ")}`
+      `${candidate.title} ${candidate.summary} ${candidate.scopeNotes} ${candidate.distinctionNotes || ""} ${(candidate.tags || []).join(" ")} ${
+        (candidate.sourceRefs || []).map((ref) => `${ref.title} ${(ref.tags || []).join(" ")}`).join(" ")
+      }`
     );
 
     const lexicalScore = jaccard(sourceTokens, candidateTokens);
@@ -221,6 +250,13 @@ export function assessGranularityHeuristic(topic, allTopics) {
     reasons.push("Ueberschneidung mit mehreren Topics erkannt.");
   }
 
+  if (overlaps.length > 0 && overlaps[0].lexicalScore >= 0.8 && !(topic.distinctionNotes || "").trim()) {
+    score -= 20;
+    reasons.push("Sehr hohe Aehnlichkeit erkannt. Fachliche Abgrenzung oder Zusammenfuehrung erforderlich.");
+    splitSuggestions.push("Ergaenze klare fachliche Unterschiede im Feld 'Abgrenzung zu aehnlichen Topics'.");
+    splitSuggestions.push(`Alternativ: Zusammenfuehrung mit Topic '${overlaps[0].title}' pruefen.`);
+  }
+
   if (score < 75) {
     const candidatePhrases = tokenize(`${title} ${summary}`).slice(0, 9);
     if (candidatePhrases.length >= 3) {
@@ -276,8 +312,15 @@ export function buildTopicChunks(topic) {
   pushChunk("title", topic.title);
   pushChunk("summary", topic.summary);
   pushChunk("scope", topic.scopeNotes);
+  pushChunk("distinction", topic.distinctionNotes);
   if (topic.tags && topic.tags.length) {
     pushChunk("tags", topic.tags.join(", "));
+  }
+  if (topic.sourceRefs && topic.sourceRefs.length) {
+    pushChunk(
+      "sources",
+      topic.sourceRefs.map((ref) => `${ref.pageId}: ${ref.title} ${(ref.tags || []).join(", ")}`).join(" | ")
+    );
   }
 
   return chunks;
@@ -301,6 +344,9 @@ export function createTopicMetadataForConfluence(topic) {
       scopeNotes: topic.scopeNotes,
       parentTopicId: topic.parentTopicId,
       sourcePageId: topic.sourcePageId,
+      sourceRefs: topic.sourceRefs || [],
+      sourceTags: topic.sourceTags || [],
+      distinctionNotes: topic.distinctionNotes || "",
       landingPageId: topic.landingPageId,
       tags: topic.tags,
       quality: topic.quality,
