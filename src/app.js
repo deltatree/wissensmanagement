@@ -304,7 +304,7 @@ function renderProviderForm() {
 function renderConfluenceForm() {
   el.confBaseUrl.value = state.confluence.baseUrl;
   el.confRootPageId.value = state.confluence.rootPageId;
-  el.confAuthMode.value = state.confluence.authMode;
+  el.confAuthMode.value = state.confluence.authMode || "session";
   el.confTimeoutMs.value = String(state.confluence.timeoutMs || 20000);
   el.confEmail.value = state.confluence.email;
   el.confApiToken.value = state.confluence.apiToken;
@@ -313,9 +313,12 @@ function renderConfluenceForm() {
 }
 
 function renderConfluenceAuthVisibility() {
-  const bearer = el.confAuthMode.value === "bearer";
-  el.confEmailWrap.classList.toggle("hidden", bearer);
-  el.confApiTokenWrap.classList.toggle("hidden", bearer);
+  const mode = el.confAuthMode.value || "session";
+  const basic = mode === "basic";
+  const bearer = mode === "bearer";
+
+  el.confEmailWrap.classList.toggle("hidden", !basic);
+  el.confApiTokenWrap.classList.toggle("hidden", !basic);
   el.confPatWrap.classList.toggle("hidden", !bearer);
 }
 
@@ -696,11 +699,26 @@ async function syncAllTopics() {
 function readConfluenceFormToState() {
   state.confluence.baseUrl = String(el.confBaseUrl.value || "").trim();
   state.confluence.rootPageId = String(el.confRootPageId.value || "").trim();
-  state.confluence.authMode = el.confAuthMode.value;
+  state.confluence.authMode = el.confAuthMode.value || "session";
   state.confluence.timeoutMs = Number(el.confTimeoutMs.value) || 20000;
-  state.confluence.email = String(el.confEmail.value || "").trim();
-  state.confluence.apiToken = String(el.confApiToken.value || "").trim();
-  state.confluence.pat = String(el.confPat.value || "").trim();
+
+  if (state.confluence.authMode === "basic") {
+    state.confluence.email = String(el.confEmail.value || "").trim();
+    state.confluence.apiToken = String(el.confApiToken.value || "").trim();
+    state.confluence.pat = "";
+    return;
+  }
+
+  if (state.confluence.authMode === "bearer") {
+    state.confluence.pat = String(el.confPat.value || "").trim();
+    state.confluence.email = "";
+    state.confluence.apiToken = "";
+    return;
+  }
+
+  state.confluence.email = "";
+  state.confluence.apiToken = "";
+  state.confluence.pat = "";
 }
 
 function readProviderFormToState() {

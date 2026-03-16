@@ -1,14 +1,31 @@
 import { createTopicMetadataForConfluence, normalizeTopicInput } from "./domain.js";
 
 function normalizeBaseUrl(baseUrl) {
-  let url = String(baseUrl || "").trim().replace(/\/+$/, "");
-  if (!url) {
+  const provided = String(baseUrl || "").trim().replace(/\/+$/, "");
+  if (provided) {
+    return provided;
+  }
+
+  if (typeof window === "undefined") {
     return "";
   }
-  if (!url.endsWith("/wiki")) {
-    url += "/wiki";
+
+  const origin = String(window.location?.origin || "").trim();
+  const pathname = String(window.location?.pathname || "");
+  if (!origin) {
+    return "";
   }
-  return url;
+
+  if (/\/wiki(\/|$)/.test(pathname)) {
+    return `${origin}/wiki`;
+  }
+
+  const parts = pathname.split("/").filter(Boolean);
+  if (parts.length > 0) {
+    return `${origin}/${parts[0]}`;
+  }
+
+  return origin;
 }
 
 function escapeHtml(value) {
@@ -30,6 +47,10 @@ function unescapeHtml(value) {
 }
 
 function authHeader(config) {
+  if (config.authMode === "session") {
+    return "";
+  }
+
   if (config.authMode === "bearer") {
     if (!config.pat) {
       throw new Error("Confluence Bearer PAT fehlt.");
@@ -44,11 +65,17 @@ function authHeader(config) {
 }
 
 function buildHeaders(config) {
-  return {
+  const headers = {
     "Content-Type": "application/json",
-    Accept: "application/json",
-    Authorization: authHeader(config)
+    Accept: "application/json"
   };
+
+  const authorization = authHeader(config);
+  if (authorization) {
+    headers.Authorization = authorization;
+  }
+
+  return headers;
 }
 
 function buildTopicPageBody(topic) {
@@ -133,6 +160,7 @@ export class ConfluenceService {
           ...buildHeaders(config),
           ...(options.headers || {})
         },
+        credentials: config.authMode === "session" ? "include" : "omit",
         signal: controller.signal
       });
 

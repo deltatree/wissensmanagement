@@ -156,13 +156,13 @@
     .grid-2 {
       display: grid;
       gap: 12px;
-      grid-template-columns: 1.15fr 0.85fr;
+      grid-template-columns: minmax(360px, 1.15fr) minmax(300px, 0.85fr);
     }
 
     .grid-3 {
       display: grid;
       gap: 10px;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: repeat(3, minmax(180px, 1fr));
     }
 
     .card {
@@ -334,6 +334,12 @@
     a:hover { text-decoration: underline; }
 
     @media (max-width: 980px) {
+      .grid-3 {
+        grid-template-columns: repeat(2, minmax(180px, 1fr));
+      }
+    }
+
+    @media (max-width: 760px) {
       .grid-2,
       .grid-3 {
         grid-template-columns: 1fr;
@@ -548,7 +554,7 @@
 
             <div class="field">
               <label for="confBaseUrl">Confluence Base URL</label>
-              <input id="confBaseUrl" type="url" placeholder="https://your-org.atlassian.net/wiki" />
+              <input id="confBaseUrl" type="url" placeholder="z. B. https://your-org.atlassian.net/wiki oder https://confluence.example.de/confluence" />
             </div>
 
             <div class="grid-3">
@@ -559,6 +565,7 @@
               <div class="field">
                 <label for="confAuthMode">Auth Mode</label>
                 <select id="confAuthMode">
+                  <option value="session">session (Confluence Login-Session nutzen)</option>
                   <option value="basic">basic (email + api token)</option>
                   <option value="bearer">bearer PAT</option>
                 </select>
@@ -584,6 +591,7 @@
               <label for="confPat">Bearer PAT</label>
               <input id="confPat" type="password" autocomplete="off" />
             </div>
+            <p class="small">Empfohlen: <strong>session</strong>. Dann werden keine Confluence-Credentials lokal hinterlegt.</p>
 
             <div class="btn-row">
               <button id="saveConfluenceBtn" type="button">Confluence Config speichern</button>

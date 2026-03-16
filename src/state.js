@@ -22,7 +22,7 @@ export function createDefaultState() {
     confluence: {
       baseUrl: "",
       rootPageId: "",
-      authMode: "basic",
+      authMode: "session",
       email: "",
       apiToken: "",
       pat: "",
@@ -52,7 +52,7 @@ export function mergeWithDefaults(input) {
     return defaults;
   }
 
-  return {
+  const merged = {
     ...defaults,
     ...input,
     settings: {
@@ -83,6 +83,39 @@ export function mergeWithDefaults(input) {
       ...(input.ui || {})
     }
   };
+
+  if (merged.settings.activeProvider !== "local-browser" && merged.settings.activeProvider !== "azure") {
+    merged.settings.activeProvider = "local-browser";
+  }
+
+  const azure = merged.providers.azure || {};
+  const hasAzureConfig = Boolean(
+    String(azure.endpoint || "").trim() &&
+      String(azure.chatModel || "").trim() &&
+      String(azure.apiKey || "").trim()
+  );
+
+  if (!hasAzureConfig) {
+    merged.settings.activeProvider = "local-browser";
+  }
+
+  if (!["session", "basic", "bearer"].includes(merged.confluence.authMode)) {
+    merged.confluence.authMode = "session";
+  }
+
+  if (
+    merged.confluence.authMode === "basic" &&
+    !String(merged.confluence.email || "").trim() &&
+    !String(merged.confluence.apiToken || "").trim()
+  ) {
+    merged.confluence.authMode = "session";
+  }
+
+  if (merged.confluence.authMode === "bearer" && !String(merged.confluence.pat || "").trim()) {
+    merged.confluence.authMode = "session";
+  }
+
+  return merged;
 }
 
 export function mapLegacyPrototypeState(legacy) {
@@ -95,7 +128,8 @@ export function mapLegacyPrototypeState(legacy) {
   const cfg = legacy.config || legacy;
 
   if (cfg.endpoint || cfg.apiKey || cfg.deployment) {
-    next.settings.activeProvider = "azure";
+    // Legacy Azure configs are migrated, but local provider stays default.
+    next.settings.activeProvider = "local-browser";
     next.providers.azure.endpoint = String(cfg.endpoint || "").trim();
     next.providers.azure.apiKey = String(cfg.apiKey || "").trim();
     next.providers.azure.chatModel = String(cfg.deployment || cfg.chatModel || "").trim() || next.providers.azure.chatModel;

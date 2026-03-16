@@ -32,7 +32,7 @@ Die Anwendung ist jetzt ein durchgaengiger vertikaler Slice fuer kollaboratives 
 1. `index.html` im Browser oeffnen (oder in Confluence als HTML-Makro/iframe hosten).
 2. Passwort setzen/entsperren.
 3. Unter `AI Provider` den aktiven Provider konfigurieren.
-4. Unter `Confluence Registry` Root-Page + Auth konfigurieren.
+4. Unter `Confluence Registry` Root-Page konfigurieren und als Auth standardmaessig `session` nutzen (Confluence Login-Session).
 5. Topics anlegen, bewerten und nach Confluence syncen.
 6. Unter `Search & Retrieval` Index aufbauen und suchen.
 
