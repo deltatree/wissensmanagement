@@ -262,7 +262,7 @@
             <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.2" />
           </div>
           <div class="field">
-            <label for="maxTokens">Max Tokens</label>
+            <label for="maxTokens">Max Output Tokens</label>
             <input id="maxTokens" type="number" min="1" step="1" value="700" />
           </div>
         </div>
@@ -495,27 +495,104 @@
           url = base + "/openai/deployments/" + encodeURIComponent(config.deployment) + "/chat/completions?api-version=" + encodeURIComponent(config.apiVersion);
         }
 
+        return {
+          url: url,
+          headers: {
+            "Content-Type": "application/json",
+            "api-key": config.apiKey
+          }
+        };
+      }
+
+      function buildPayload(config, tokenFieldName) {
         var payload = {
           messages: buildMessages(config.systemPrompt),
-          temperature: config.temperature,
-          max_tokens: config.maxTokens
+          temperature: config.temperature
         };
+
+        payload[tokenFieldName] = config.maxTokens;
 
         if (config.apiMode === "v1") {
           payload.model = config.deployment;
         }
 
+        return payload;
+      }
+
+      function detectTokenFieldSuggestion(rawError, currentField) {
+        var text = (rawError || "").toLowerCase();
+        var hasUnsupportedHint = text.indexOf("not supported") !== -1 || text.indexOf("unsupported") !== -1;
+        var mentionsMaxTokens = text.indexOf("max_tokens") !== -1;
+        var mentionsMaxCompletionTokens = text.indexOf("max_completion_tokens") !== -1;
+
+        if (!hasUnsupportedHint) {
+          return "";
+        }
+
+        if (currentField === "max_completion_tokens" && mentionsMaxTokens) {
+          return "max_tokens";
+        }
+
+        if (currentField === "max_tokens" && mentionsMaxCompletionTokens) {
+          return "max_completion_tokens";
+        }
+
+        return "";
+      }
+
+      async function postChatCompletion(requestMeta, payload) {
+        var response = await fetch(requestMeta.url, {
+          method: "POST",
+          headers: requestMeta.headers,
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          return {
+            ok: false,
+            status: response.status,
+            rawError: await response.text()
+          };
+        }
+
         return {
-          url: url,
-          options: {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "api-key": config.apiKey
-            },
-            body: JSON.stringify(payload)
-          }
+          ok: true,
+          data: await response.json()
         };
+      }
+
+      async function executeWithTokenFallback(config) {
+        var requestMeta = buildRequest(config);
+        var tried = {};
+        var tokenField = "max_completion_tokens";
+        var lastError = "";
+        var lastStatus = 0;
+
+        while (tokenField && !tried[tokenField]) {
+          tried[tokenField] = true;
+
+          var payload = buildPayload(config, tokenField);
+          var result = await postChatCompletion(requestMeta, payload);
+          if (result.ok) {
+            return {
+              data: result.data,
+              tokenField: tokenField
+            };
+          }
+
+          lastError = result.rawError || "";
+          lastStatus = result.status || 0;
+
+          var suggested = detectTokenFieldSuggestion(lastError, tokenField);
+          if (suggested && !tried[suggested]) {
+            tokenField = suggested;
+            continue;
+          }
+
+          break;
+        }
+
+        throw new Error("HTTP " + lastStatus + ": " + lastError);
       }
 
       async function sendMessage(userText) {
@@ -530,25 +607,19 @@
         chatHistory.push({ role: "user", content: userText });
         renderMessages();
 
-        var req = buildRequest(config);
         setStatus("Anfrage laeuft...", false);
 
         try {
           isLoading = true;
           el.sendBtn.disabled = true;
 
-          var response = await fetch(req.url, req.options);
-          if (!response.ok) {
-            var rawError = await response.text();
-            throw new Error("HTTP " + response.status + ": " + rawError);
-          }
-
-          var data = await response.json();
+          var result = await executeWithTokenFallback(config);
+          var data = result.data;
           var assistantText = extractAssistantText(data);
 
           chatHistory.push({ role: "assistant", content: assistantText || "(Keine Ausgabe)" });
           renderMessages();
-          setStatus("Antwort erhalten.", false);
+          setStatus("Antwort erhalten (Token-Feld: " + result.tokenField + ").", false);
         } catch (err) {
           var message = err && err.message ? err.message : String(err);
           if (message && message.toLowerCase().indexOf("failed to fetch") !== -1) {
