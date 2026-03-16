@@ -7,8 +7,8 @@ export function createDefaultState() {
     },
     providers: {
       local: {
-        chatModel: "Xenova/mt5-small",
-        embeddingModel: "Xenova/paraphrase-multilingual-MiniLM-L12-v2"
+        chatModel: "km-local-heuristic-chat-de",
+        embeddingModel: "km-local-hash-embed-de"
       },
       azure: {
         apiMode: "v1",

@@ -23,75 +23,147 @@ let qualityPreview = null;
 const providerManager = new ProviderManager(() => state);
 const confluenceService = new ConfluenceService(() => state.confluence);
 
-const el = {
-  lockShell: document.getElementById("lockShell"),
-  appRoot: document.getElementById("appRoot"),
-  lockDescription: document.getElementById("lockDescription"),
-  unlockPassword: document.getElementById("unlockPassword"),
-  unlockPasswordConfirm: document.getElementById("unlockPasswordConfirm"),
-  confirmWrap: document.getElementById("confirmWrap"),
-  unlockBtn: document.getElementById("unlockBtn"),
-  resetStorageBtn: document.getElementById("resetStorageBtn"),
-  lockStatus: document.getElementById("lockStatus"),
+let el = null;
 
-  providerBadge: document.getElementById("providerBadge"),
-  saveAllBtn: document.getElementById("saveAllBtn"),
-  lockBtn: document.getElementById("lockBtn"),
+function resolveElements() {
+  return {
+    lockShell: document.getElementById("lockShell"),
+    appRoot: document.getElementById("appRoot"),
+    lockDescription: document.getElementById("lockDescription"),
+    unlockPassword: document.getElementById("unlockPassword"),
+    unlockPasswordConfirm: document.getElementById("unlockPasswordConfirm"),
+    confirmWrap: document.getElementById("confirmWrap"),
+    unlockBtn: document.getElementById("unlockBtn"),
+    resetStorageBtn: document.getElementById("resetStorageBtn"),
+    lockStatus: document.getElementById("lockStatus"),
 
-  tabButtons: Array.from(document.querySelectorAll(".tab-btn")),
+    providerBadge: document.getElementById("providerBadge"),
+    saveAllBtn: document.getElementById("saveAllBtn"),
+    lockBtn: document.getElementById("lockBtn"),
 
-  topicTitle: document.getElementById("topicTitle"),
-  topicSummary: document.getElementById("topicSummary"),
-  topicScopeNotes: document.getElementById("topicScopeNotes"),
-  topicSourcePageId: document.getElementById("topicSourcePageId"),
-  topicParent: document.getElementById("topicParent"),
-  topicTags: document.getElementById("topicTags"),
-  newTopicBtn: document.getElementById("newTopicBtn"),
-  assessTopicBtn: document.getElementById("assessTopicBtn"),
-  saveTopicBtn: document.getElementById("saveTopicBtn"),
-  syncTopicBtn: document.getElementById("syncTopicBtn"),
-  topicFormStatus: document.getElementById("topicFormStatus"),
-  qualityBox: document.getElementById("qualityBox"),
-  topicTableWrap: document.getElementById("topicTableWrap"),
+    tabButtons: Array.from(document.querySelectorAll(".tab-btn")),
 
-  searchQuery: document.getElementById("searchQuery"),
-  searchTopK: document.getElementById("searchTopK"),
-  rebuildIndexBtn: document.getElementById("rebuildIndexBtn"),
-  runSearchBtn: document.getElementById("runSearchBtn"),
-  searchStatus: document.getElementById("searchStatus"),
-  searchResultList: document.getElementById("searchResultList"),
+    topicTitle: document.getElementById("topicTitle"),
+    topicSummary: document.getElementById("topicSummary"),
+    topicScopeNotes: document.getElementById("topicScopeNotes"),
+    topicSourcePageId: document.getElementById("topicSourcePageId"),
+    topicParent: document.getElementById("topicParent"),
+    topicTags: document.getElementById("topicTags"),
+    newTopicBtn: document.getElementById("newTopicBtn"),
+    assessTopicBtn: document.getElementById("assessTopicBtn"),
+    saveTopicBtn: document.getElementById("saveTopicBtn"),
+    syncTopicBtn: document.getElementById("syncTopicBtn"),
+    topicFormStatus: document.getElementById("topicFormStatus"),
+    qualityBox: document.getElementById("qualityBox"),
+    topicTableWrap: document.getElementById("topicTableWrap"),
 
-  activeProvider: document.getElementById("activeProvider"),
-  localChatModel: document.getElementById("localChatModel"),
-  localEmbeddingModel: document.getElementById("localEmbeddingModel"),
-  azureApiMode: document.getElementById("azureApiMode"),
-  azureEndpoint: document.getElementById("azureEndpoint"),
-  azureChatModel: document.getElementById("azureChatModel"),
-  azureEmbeddingModel: document.getElementById("azureEmbeddingModel"),
-  azureApiVersion: document.getElementById("azureApiVersion"),
-  azureApiKey: document.getElementById("azureApiKey"),
-  saveProviderBtn: document.getElementById("saveProviderBtn"),
-  checkProviderHealthBtn: document.getElementById("checkProviderHealthBtn"),
-  providerStatus: document.getElementById("providerStatus"),
-  providerCapabilityBox: document.getElementById("providerCapabilityBox"),
+    searchQuery: document.getElementById("searchQuery"),
+    searchTopK: document.getElementById("searchTopK"),
+    rebuildIndexBtn: document.getElementById("rebuildIndexBtn"),
+    runSearchBtn: document.getElementById("runSearchBtn"),
+    searchStatus: document.getElementById("searchStatus"),
+    searchResultList: document.getElementById("searchResultList"),
 
-  confBaseUrl: document.getElementById("confBaseUrl"),
-  confRootPageId: document.getElementById("confRootPageId"),
-  confAuthMode: document.getElementById("confAuthMode"),
-  confTimeoutMs: document.getElementById("confTimeoutMs"),
-  confEmailWrap: document.getElementById("confEmailWrap"),
-  confApiTokenWrap: document.getElementById("confApiTokenWrap"),
-  confPatWrap: document.getElementById("confPatWrap"),
-  confEmail: document.getElementById("confEmail"),
-  confApiToken: document.getElementById("confApiToken"),
-  confPat: document.getElementById("confPat"),
-  saveConfluenceBtn: document.getElementById("saveConfluenceBtn"),
-  testConfluenceBtn: document.getElementById("testConfluenceBtn"),
-  importTopicsBtn: document.getElementById("importTopicsBtn"),
-  syncAllTopicsBtn: document.getElementById("syncAllTopicsBtn"),
-  confluenceStatus: document.getElementById("confluenceStatus"),
-  syncLog: document.getElementById("syncLog")
-};
+    activeProvider: document.getElementById("activeProvider"),
+    localChatModel: document.getElementById("localChatModel"),
+    localEmbeddingModel: document.getElementById("localEmbeddingModel"),
+    azureApiMode: document.getElementById("azureApiMode"),
+    azureEndpoint: document.getElementById("azureEndpoint"),
+    azureChatModel: document.getElementById("azureChatModel"),
+    azureEmbeddingModel: document.getElementById("azureEmbeddingModel"),
+    azureApiVersion: document.getElementById("azureApiVersion"),
+    azureApiKey: document.getElementById("azureApiKey"),
+    saveProviderBtn: document.getElementById("saveProviderBtn"),
+    checkProviderHealthBtn: document.getElementById("checkProviderHealthBtn"),
+    providerStatus: document.getElementById("providerStatus"),
+    providerCapabilityBox: document.getElementById("providerCapabilityBox"),
+
+    confBaseUrl: document.getElementById("confBaseUrl"),
+    confRootPageId: document.getElementById("confRootPageId"),
+    confAuthMode: document.getElementById("confAuthMode"),
+    confTimeoutMs: document.getElementById("confTimeoutMs"),
+    confEmailWrap: document.getElementById("confEmailWrap"),
+    confApiTokenWrap: document.getElementById("confApiTokenWrap"),
+    confPatWrap: document.getElementById("confPatWrap"),
+    confEmail: document.getElementById("confEmail"),
+    confApiToken: document.getElementById("confApiToken"),
+    confPat: document.getElementById("confPat"),
+    saveConfluenceBtn: document.getElementById("saveConfluenceBtn"),
+    testConfluenceBtn: document.getElementById("testConfluenceBtn"),
+    importTopicsBtn: document.getElementById("importTopicsBtn"),
+    syncAllTopicsBtn: document.getElementById("syncAllTopicsBtn"),
+    confluenceStatus: document.getElementById("confluenceStatus"),
+    syncLog: document.getElementById("syncLog")
+  };
+}
+
+function validateElements() {
+  const requiredKeys = [
+    "lockShell",
+    "appRoot",
+    "unlockPassword",
+    "unlockPasswordConfirm",
+    "unlockBtn",
+    "resetStorageBtn",
+    "lockStatus",
+    "providerBadge",
+    "saveAllBtn",
+    "lockBtn",
+    "topicTitle",
+    "topicSummary",
+    "topicScopeNotes",
+    "topicSourcePageId",
+    "topicParent",
+    "topicTags",
+    "newTopicBtn",
+    "assessTopicBtn",
+    "saveTopicBtn",
+    "syncTopicBtn",
+    "topicFormStatus",
+    "qualityBox",
+    "topicTableWrap",
+    "searchQuery",
+    "searchTopK",
+    "rebuildIndexBtn",
+    "runSearchBtn",
+    "searchStatus",
+    "searchResultList",
+    "activeProvider",
+    "localChatModel",
+    "localEmbeddingModel",
+    "azureApiMode",
+    "azureEndpoint",
+    "azureChatModel",
+    "azureEmbeddingModel",
+    "azureApiVersion",
+    "azureApiKey",
+    "saveProviderBtn",
+    "checkProviderHealthBtn",
+    "providerStatus",
+    "providerCapabilityBox",
+    "confBaseUrl",
+    "confRootPageId",
+    "confAuthMode",
+    "confTimeoutMs",
+    "confEmailWrap",
+    "confApiTokenWrap",
+    "confPatWrap",
+    "confEmail",
+    "confApiToken",
+    "confPat",
+    "saveConfluenceBtn",
+    "testConfluenceBtn",
+    "importTopicsBtn",
+    "syncAllTopicsBtn",
+    "confluenceStatus",
+    "syncLog"
+  ];
+
+  const missing = requiredKeys.filter((key) => !el[key]);
+  if (missing.length) {
+    throw new Error(`HTML unvollstaendig oder vom Host gefiltert. Fehlende Elemente: ${missing.join(", ")}`);
+  }
+}
 
 function now() {
   return new Date().toISOString();
@@ -206,7 +278,9 @@ function setActiveTab(tabId) {
   const panels = ["topics", "search", "providers", "confluence"];
   for (const panelId of panels) {
     const panel = document.getElementById(`tab-${panelId}`);
-    panel.classList.toggle("active", panelId === tabId);
+    if (panel) {
+      panel.classList.toggle("active", panelId === tabId);
+    }
   }
 }
 
@@ -932,10 +1006,36 @@ function initializeTopicForm() {
 }
 
 function initialize() {
+  el = resolveElements();
+  validateElements();
   bindEvents();
   initializeTopicForm();
   refreshLockUi();
   lockApp();
 }
 
-initialize();
+function showBootError(error) {
+  console.error("App start failed:", error);
+  const message = `Initialisierung fehlgeschlagen: ${error?.message || "Unbekannter Fehler"}`;
+  const statusNode = document.getElementById("lockStatus");
+  if (statusNode) {
+    statusNode.textContent = message;
+    statusNode.className = "status error";
+    return;
+  }
+  document.body.innerHTML = `<pre style="padding:12px; color:#b91c1c; white-space:pre-wrap;">${escapeHtml(message)}</pre>`;
+}
+
+function boot() {
+  try {
+    initialize();
+  } catch (error) {
+    showBootError(error);
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", boot, { once: true });
+} else {
+  boot();
+}

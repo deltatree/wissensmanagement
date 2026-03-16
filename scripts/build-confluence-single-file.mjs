@@ -20,7 +20,9 @@ function assertNoExternalReferences(html) {
     /<(?:script|link|img|iframe|audio|video|source|object|embed)\b[^>]*(?:src|href)\s*=\s*["']\s*(https?:\/\/|\/\/)/gi;
   const cssUrlPattern = /url\(\s*["']?\s*(https?:\/\/|\/\/)/gi;
   const jsImportPattern = /\bimport\s*\(\s*["']\s*(https?:\/\/|\/\/)/gi;
-  const genericSrcTagPattern = /<script\b[^>]*\bsrc\s*=/gi;
+  const nonDataScriptSrcPattern =
+    /<script\b[^>]*\bsrc\s*=\s*["']\s*(?!data:(?:text|application)\/javascript;base64,)[^"']+/gi;
+  const sourceMapRefPattern = /(?:\/\/[#@]\s*sourceMappingURL\s*=|\/\*[#@]\s*sourceMappingURL\s*=)/gi;
 
   for (const pattern of [externalAssetPattern, cssUrlPattern, jsImportPattern]) {
     let match;
@@ -34,8 +36,17 @@ function assertNoExternalReferences(html) {
   }
 
   let srcMatch;
-  while ((srcMatch = genericSrcTagPattern.exec(html)) !== null) {
+  while ((srcMatch = nonDataScriptSrcPattern.exec(html)) !== null) {
     const snippet = html.slice(Math.max(0, srcMatch.index - 40), Math.min(html.length, srcMatch.index + 120));
+    violations.push(snippet.replace(/\s+/g, " ").trim());
+    if (violations.length > 20) {
+      break;
+    }
+  }
+
+  let sourceMapMatch;
+  while ((sourceMapMatch = sourceMapRefPattern.exec(html)) !== null) {
+    const snippet = html.slice(Math.max(0, sourceMapMatch.index - 40), Math.min(html.length, sourceMapMatch.index + 120));
     violations.push(snippet.replace(/\s+/g, " ").trim());
     if (violations.length > 20) {
       break;
@@ -48,6 +59,12 @@ function assertNoExternalReferences(html) {
       `Externe Referenzen gefunden. Build wurde abgebrochen.\n${details}`
     );
   }
+}
+
+function stripSourceMapComments(code) {
+  return String(code)
+    .replace(/^[ \t]*\/\/[#@]\s*sourceMappingURL=.*$/gm, "")
+    .replace(/\/\*[#@]\s*sourceMappingURL=.*?\*\//g, "");
 }
 
 async function bundleAppScript() {
@@ -79,8 +96,21 @@ async function createSingleFileHtml() {
     throw new Error(`Erwarteter Script-Tag nicht gefunden: ${SCRIPT_TAG}`);
   }
 
-  const inlineScriptTag = `<script>\n${bundle}\n</script>`;
-  const output = template.replace(SCRIPT_TAG, inlineScriptTag);
+  const sanitizedBundle = stripSourceMapComments(bundle);
+  const guardedBundle = [
+    "if (window.__KM_APP_BOOTSTRAPPED__) {",
+    "  void 0;",
+    "} else {",
+    "  window.__KM_APP_BOOTSTRAPPED__ = true;",
+    sanitizedBundle,
+    "}"
+  ].join("\n");
+  const encodedBundle = Buffer.from(guardedBundle, "utf8").toString("base64");
+  const embeddedScriptTag = [
+    `<script>\n${guardedBundle}\n</script>`,
+    `<script src="data:text/javascript;base64,${encodedBundle}"></script>`
+  ].join("\n");
+  const output = stripSourceMapComments(template.replace(SCRIPT_TAG, embeddedScriptTag));
 
   assertNoExternalReferences(output);
 
