@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Azure OpenAI Chat Prototype (Confluence)</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #1c2430;
+      --muted: #5a6778;
+      --border: #d7dfe9;
+      --accent: #0e7490;
+      --accent-2: #115e59;
+      --error: #b91c1c;
+      --user: #dbeafe;
+      --assistant: #ecfeff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at top left, #e0f2fe 0%, var(--bg) 30%);
+    }
+
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 16px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .title {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .title h1 {
+      margin: 0 0 8px;
+      font-size: 1.3rem;
+    }
+
+    .title p {
+      margin: 4px 0;
+      color: var(--muted);
+      line-height: 1.4;
+      font-size: 0.95rem;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 16px;
+    }
+
+    .panel,
+    .chat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .panel h2,
+    .chat h2 {
+      margin: 4px 0 12px;
+      font-size: 1.05rem;
+    }
+
+    .field {
+      margin-bottom: 10px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.85rem;
+      margin-bottom: 5px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    input,
+    select,
+    textarea,
+    button {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: #fff;
+      color: inherit;
+    }
+
+    textarea { resize: vertical; }
+
+    .row {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .actions button,
+    .composer button {
+      cursor: pointer;
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .actions button.secondary {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 6px;
+      line-height: 1.35;
+    }
+
+    .messages {
+      height: 460px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fbfdff;
+      margin-bottom: 10px;
+    }
+
+    .msg {
+      padding: 10px;
+      border-radius: 10px;
+      margin-bottom: 8px;
+      white-space: pre-wrap;
+      line-height: 1.45;
+      border: 1px solid transparent;
+    }
+
+    .msg.user {
+      background: var(--user);
+      border-color: #bfdbfe;
+    }
+
+    .msg.assistant {
+      background: var(--assistant);
+      border-color: #bae6fd;
+    }
+
+    .msg .role {
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-bottom: 5px;
+      opacity: 0.8;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .composer {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+    }
+
+    .composer textarea {
+      min-height: 70px;
+      max-height: 170px;
+    }
+
+    .status {
+      margin-top: 8px;
+      min-height: 20px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .status.error {
+      color: var(--error);
+      font-weight: 600;
+    }
+
+    @media (max-width: 950px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .messages {
+        height: 360px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="title">
+      <h1>Azure OpenAI Chat Prototype (HTML + JavaScript)</h1>
+      <p>Einfacher Test-Client ohne Build-Tool, geeignet als Durchstich in einer Confluence-Zielumgebung.</p>
+      <p><strong>Hinweis:</strong> API-Key im Browser ist nur fuer Prototypen geeignet. Fuer Produktion immer ein Backend/Proxy verwenden.</p>
+    </section>
+
+    <div class="layout">
+      <aside class="panel">
+        <h2>Verbindung</h2>
+
+        <div class="field">
+          <label for="apiMode">API-Modus</label>
+          <select id="apiMode">
+            <option value="v1">v1 Chat Completions (/openai/v1/chat/completions)</option>
+            <option value="deployment">Deployment Chat Completions (/openai/deployments/...)</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="endpoint">Endpoint (Basis-URL)</label>
+          <input id="endpoint" type="url" placeholder="https://YOUR-RESOURCE-NAME.openai.azure.com" />
+        </div>
+
+        <div class="field">
+          <label for="deployment">Model/Deployment</label>
+          <input id="deployment" type="text" placeholder="z. B. gpt-4.1-nano oder mein-deployment" />
+        </div>
+
+        <div class="field" id="apiVersionWrap">
+          <label for="apiVersion">API-Version (nur Deployment-Modus)</label>
+          <input id="apiVersion" type="text" value="2024-10-21" />
+        </div>
+
+        <div class="field">
+          <label for="apiKey">API-Key</label>
+          <input id="apiKey" type="password" autocomplete="off" placeholder="Azure OpenAI API Key" />
+        </div>
+
+        <div class="field">
+          <label>
+            <input id="storeKey" type="checkbox" style="width:auto; margin-right:6px;" />
+            API-Key lokal speichern (nur Test)
+          </label>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="temperature">Temperature</label>
+            <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.2" />
+          </div>
+          <div class="field">
+            <label for="maxTokens">Max Tokens</label>
+            <input id="maxTokens" type="number" min="1" step="1" value="700" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="systemPrompt">System Prompt</label>
+          <textarea id="systemPrompt" rows="4">Du bist ein hilfreicher Assistent.</textarea>
+        </div>
+
+        <div class="actions">
+          <button id="saveConfigBtn" type="button">Konfiguration speichern</button>
+          <button id="clearChatBtn" class="secondary" type="button">Chat loeschen</button>
+        </div>
+
+        <p class="hint">Wenn in Confluence kein JavaScript erlaubt ist, diese HTML-Datei extern hosten und per IFrame einbinden.</p>
+      </aside>
+
+      <section class="chat">
+        <h2>Chat</h2>
+        <div id="messages" class="messages"></div>
+
+        <form id="chatForm" class="composer">
+          <textarea id="userInput" placeholder="Nachricht eingeben..." required></textarea>
+          <button id="sendBtn" type="submit">Senden</button>
+        </form>
+
+        <div id="status" class="status"></div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var STORAGE_KEY = "azure-openai-prototype-config-v1";
+      var chatHistory = [];
+      var isLoading = false;
+
+      var el = {
+        apiMode: document.getElementById("apiMode"),
+        endpoint: document.getElementById("endpoint"),
+        deployment: document.getElementById("deployment"),
+        apiVersion: document.getElementById("apiVersion"),
+        apiVersionWrap: document.getElementById("apiVersionWrap"),
+        apiKey: document.getElementById("apiKey"),
+        storeKey: document.getElementById("storeKey"),
+        temperature: document.getElementById("temperature"),
+        maxTokens: document.getElementById("maxTokens"),
+        systemPrompt: document.getElementById("systemPrompt"),
+        saveConfigBtn: document.getElementById("saveConfigBtn"),
+        clearChatBtn: document.getElementById("clearChatBtn"),
+        chatForm: document.getElementById("chatForm"),
+        userInput: document.getElementById("userInput"),
+        sendBtn: document.getElementById("sendBtn"),
+        messages: document.getElementById("messages"),
+        status: document.getElementById("status")
+      };
+
+      function normalizeEndpoint(endpoint) {
+        return endpoint.replace(/\/+$/, "");
+      }
+
+      function setStatus(message, isError) {
+        el.status.textContent = message || "";
+        el.status.className = isError ? "status error" : "status";
+      }
+
+      function renderMessages() {
+        el.messages.innerHTML = "";
+
+        if (!chatHistory.length) {
+          var empty = document.createElement("div");
+          empty.className = "hint";
+          empty.textContent = "Noch keine Nachrichten. Starte mit einer ersten Frage.";
+          el.messages.appendChild(empty);
+          return;
+        }
+
+        chatHistory.forEach(function (m) {
+          var box = document.createElement("div");
+          box.className = "msg " + (m.role === "assistant" ? "assistant" : "user");
+
+          var role = document.createElement("div");
+          role.className = "role";
+          role.textContent = m.role === "assistant" ? "Assistant" : "User";
+
+          var content = document.createElement("div");
+          content.textContent = m.content;
+
+          box.appendChild(role);
+          box.appendChild(content);
+          el.messages.appendChild(box);
+        });
+
+        el.messages.scrollTop = el.messages.scrollHeight;
+      }
+
+      function getConfig() {
+        return {
+          apiMode: el.apiMode.value,
+          endpoint: el.endpoint.value.trim(),
+          deployment: el.deployment.value.trim(),
+          apiVersion: el.apiVersion.value.trim(),
+          apiKey: el.apiKey.value.trim(),
+          storeKey: el.storeKey.checked,
+          temperature: Number(el.temperature.value),
+          maxTokens: Number(el.maxTokens.value),
+          systemPrompt: el.systemPrompt.value.trim()
+        };
+      }
+
+      function saveConfig() {
+        var config = getConfig();
+        var toStore = {
+          apiMode: config.apiMode,
+          endpoint: config.endpoint,
+          deployment: config.deployment,
+          apiVersion: config.apiVersion,
+          storeKey: config.storeKey,
+          temperature: config.temperature,
+          maxTokens: config.maxTokens,
+          systemPrompt: config.systemPrompt,
+          apiKey: config.storeKey ? config.apiKey : ""
+        };
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
+        setStatus("Konfiguration gespeichert.", false);
+      }
+
+      function loadConfig() {
+        var raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          updateModeVisibility();
+          renderMessages();
+          return;
+        }
+
+        try {
+          var config = JSON.parse(raw);
+          el.apiMode.value = config.apiMode || "v1";
+          el.endpoint.value = config.endpoint || "";
+          el.deployment.value = config.deployment || "";
+          el.apiVersion.value = config.apiVersion || "2024-10-21";
+          el.storeKey.checked = !!config.storeKey;
+          el.temperature.value = Number.isFinite(config.temperature) ? String(config.temperature) : "0.2";
+          el.maxTokens.value = Number.isFinite(config.maxTokens) ? String(config.maxTokens) : "700";
+          el.systemPrompt.value = config.systemPrompt || "Du bist ein hilfreicher Assistent.";
+          el.apiKey.value = config.storeKey && config.apiKey ? config.apiKey : "";
+        } catch (err) {
+          setStatus("Gespeicherte Konfiguration konnte nicht gelesen werden.", true);
+        }
+
+        updateModeVisibility();
+        renderMessages();
+      }
+
+      function updateModeVisibility() {
+        var deploymentMode = el.apiMode.value === "deployment";
+        el.apiVersionWrap.style.display = deploymentMode ? "block" : "none";
+      }
+
+      function buildMessages(systemPrompt) {
+        var messages = [];
+
+        if (systemPrompt) {
+          messages.push({ role: "system", content: systemPrompt });
+        }
+
+        chatHistory.forEach(function (m) {
+          messages.push({ role: m.role, content: m.content });
+        });
+
+        return messages;
+      }
+
+      function extractAssistantText(responseJson) {
+        if (responseJson && responseJson.choices && responseJson.choices[0] && responseJson.choices[0].message) {
+          var content = responseJson.choices[0].message.content;
+          if (typeof content === "string") {
+            return content;
+          }
+          if (Array.isArray(content)) {
+            return content.map(function (part) {
+              if (typeof part === "string") {
+                return part;
+              }
+              if (part && typeof part.text === "string") {
+                return part.text;
+              }
+              return "";
+            }).join("\n").trim();
+          }
+        }
+
+        if (typeof responseJson.output_text === "string") {
+          return responseJson.output_text;
+        }
+
+        return JSON.stringify(responseJson, null, 2);
+      }
+
+      function validateConfig(config) {
+        if (!config.endpoint) {
+          return "Endpoint fehlt.";
+        }
+        if (!config.deployment) {
+          return "Model/Deployment fehlt.";
+        }
+        if (!config.apiKey) {
+          return "API-Key fehlt.";
+        }
+        if (config.apiMode === "deployment" && !config.apiVersion) {
+          return "API-Version fehlt (Deployment-Modus).";
+        }
+        if (!Number.isFinite(config.temperature) || config.temperature < 0 || config.temperature > 2) {
+          return "Temperature muss zwischen 0 und 2 liegen.";
+        }
+        if (!Number.isFinite(config.maxTokens) || config.maxTokens < 1) {
+          return "Max Tokens muss groesser als 0 sein.";
+        }
+        return "";
+      }
+
+      function buildRequest(config) {
+        var base = normalizeEndpoint(config.endpoint);
+        var url;
+
+        if (config.apiMode === "v1") {
+          url = base + "/openai/v1/chat/completions";
+        } else {
+          url = base + "/openai/deployments/" + encodeURIComponent(config.deployment) + "/chat/completions?api-version=" + encodeURIComponent(config.apiVersion);
+        }
+
+        var payload = {
+          messages: buildMessages(config.systemPrompt),
+          temperature: config.temperature,
+          max_tokens: config.maxTokens
+        };
+
+        if (config.apiMode === "v1") {
+          payload.model = config.deployment;
+        }
+
+        return {
+          url: url,
+          options: {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "api-key": config.apiKey
+            },
+            body: JSON.stringify(payload)
+          }
+        };
+      }
+
+      async function sendMessage(userText) {
+        var config = getConfig();
+        var error = validateConfig(config);
+
+        if (error) {
+          setStatus(error, true);
+          return;
+        }
+
+        chatHistory.push({ role: "user", content: userText });
+        renderMessages();
+
+        var req = buildRequest(config);
+        setStatus("Anfrage laeuft...", false);
+
+        try {
+          isLoading = true;
+          el.sendBtn.disabled = true;
+
+          var response = await fetch(req.url, req.options);
+          if (!response.ok) {
+            var rawError = await response.text();
+            throw new Error("HTTP " + response.status + ": " + rawError);
+          }
+
+          var data = await response.json();
+          var assistantText = extractAssistantText(data);
+
+          chatHistory.push({ role: "assistant", content: assistantText || "(Keine Ausgabe)" });
+          renderMessages();
+          setStatus("Antwort erhalten.", false);
+        } catch (err) {
+          var message = err && err.message ? err.message : String(err);
+          if (message && message.toLowerCase().indexOf("failed to fetch") !== -1) {
+            message += " (Hinweis: moeglich sind CORS-Blockade oder Netzwerk/CSP in Confluence.)";
+          }
+          setStatus("Fehler: " + message, true);
+        } finally {
+          isLoading = false;
+          el.sendBtn.disabled = false;
+        }
+      }
+
+      el.apiMode.addEventListener("change", function () {
+        updateModeVisibility();
+      });
+
+      el.saveConfigBtn.addEventListener("click", function () {
+        saveConfig();
+      });
+
+      el.clearChatBtn.addEventListener("click", function () {
+        chatHistory = [];
+        renderMessages();
+        setStatus("Chatverlauf geloescht.", false);
+      });
+
+      el.chatForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (isLoading) {
+          return;
+        }
+
+        var text = el.userInput.value.trim();
+        if (!text) {
+          return;
+        }
+
+        el.userInput.value = "";
+        sendMessage(text);
+      });
+
+      loadConfig();
+      setStatus("Bereit.", false);
+    })();
+  </script>
+</body>
+</html>
