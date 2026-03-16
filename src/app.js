@@ -78,8 +78,13 @@ function resolveElements() {
     topicSummary: document.getElementById("topicSummary"),
     topicScopeNotes: document.getElementById("topicScopeNotes"),
     topicSourcePageId: document.getElementById("topicSourcePageId"),
+    sourceScopeMode: document.getElementById("sourceScopeMode"),
+    sourceScopePageId: document.getElementById("sourceScopePageId"),
+    sourceTextQuery: document.getElementById("sourceTextQuery"),
     sourceTagQuery: document.getElementById("sourceTagQuery"),
     loadSourcePagesBtn: document.getElementById("loadSourcePagesBtn"),
+    selectAllSourcesBtn: document.getElementById("selectAllSourcesBtn"),
+    clearSelectedSourcesBtn: document.getElementById("clearSelectedSourcesBtn"),
     deriveTopicFieldsBtn: document.getElementById("deriveTopicFieldsBtn"),
     sourcePageStatus: document.getElementById("sourcePageStatus"),
     sourceCandidateList: document.getElementById("sourceCandidateList"),
@@ -152,8 +157,13 @@ function validateElements() {
     "topicSummary",
     "topicScopeNotes",
     "topicSourcePageId",
+    "sourceScopeMode",
+    "sourceScopePageId",
+    "sourceTextQuery",
     "sourceTagQuery",
     "loadSourcePagesBtn",
+    "selectAllSourcesBtn",
+    "clearSelectedSourcesBtn",
     "deriveTopicFieldsBtn",
     "sourcePageStatus",
     "sourceCandidateList",
@@ -264,6 +274,50 @@ function syncPrimarySourceField() {
   el.topicSourcePageId.value = selectedSourceRefs.length ? selectedSourceRefs[0].pageId : "";
 }
 
+function currentSourceScopeMode() {
+  return String(el.sourceScopeMode.value || "current-page");
+}
+
+function applySourceScopeUi() {
+  const mode = currentSourceScopeMode();
+  const custom = mode === "custom-page";
+  el.sourceScopePageId.disabled = !custom;
+  if (!custom && mode === "root-tree") {
+    el.sourceScopePageId.value = state.confluence.rootPageId || "";
+  }
+  if (!custom && mode === "current-page") {
+    el.sourceScopePageId.value = "";
+  }
+}
+
+function sourceScopeLabel(options) {
+  if (options.scopeMode === "root-tree") {
+    return `Root-Bereich ${options.scopePageId || "(nicht gesetzt)"}`;
+  }
+  if (options.scopeMode === "custom-page") {
+    return `Eigene Startseite ${options.scopePageId || "(nicht gesetzt)"}`;
+  }
+  return "Aktuelle Seite";
+}
+
+function readSourceSearchOptions() {
+  const scopeMode = currentSourceScopeMode();
+  const options = {
+    scopeMode,
+    scopePageId: "",
+    tags: parseTags(el.sourceTagQuery.value),
+    textQuery: String(el.sourceTextQuery.value || "").trim()
+  };
+
+  if (scopeMode === "root-tree") {
+    options.scopePageId = String(state.confluence.rootPageId || "").trim();
+  } else if (scopeMode === "custom-page") {
+    options.scopePageId = String(el.sourceScopePageId.value || "").trim();
+  }
+
+  return options;
+}
+
 function renderSourceCandidates() {
   const list = sourceCandidates.length ? sourceCandidates : selectedSourceRefs;
   if (!list.length) {
@@ -273,6 +327,7 @@ function renderSourceCandidates() {
   }
 
   const selectedIds = new Set(selectedSourceRefs.map((ref) => ref.pageId));
+  const selectedCount = list.filter((ref) => selectedIds.has(ref.pageId)).length;
   el.sourceCandidateList.innerHTML = list
     .map((ref) => {
       const checked = selectedIds.has(ref.pageId) ? "checked" : "";
@@ -289,6 +344,9 @@ function renderSourceCandidates() {
     })
     .join("\n");
 
+  if (list.length > 0) {
+    setStatus(el.sourcePageStatus, `${selectedCount}/${list.length} Quellseiten markiert.`, "info");
+  }
   syncPrimarySourceField();
 }
 
@@ -305,7 +363,20 @@ function updateSelectedSourceRefsFromCheckboxes() {
     ...displayedRefs.filter((ref) => selectedIds.has(ref.pageId))
   ]);
   selectedSourceRefs = merged;
+  const displayedCount = displayedRefs.length;
+  setStatus(el.sourcePageStatus, `${selectedSourceRefs.length}/${displayedCount} Quellseiten markiert.`, "info");
   syncPrimarySourceField();
+}
+
+function selectAllDisplayedSources() {
+  const displayedRefs = sourceCandidates.length ? sourceCandidates : selectedSourceRefs;
+  selectedSourceRefs = dedupeSourceRefs([...(selectedSourceRefs || []), ...(displayedRefs || [])]);
+  renderSourceCandidates();
+}
+
+function clearSelectedSources() {
+  selectedSourceRefs = [];
+  renderSourceCandidates();
 }
 
 function renderMergeTargetOptions(overlapCandidates = []) {
@@ -574,6 +645,10 @@ function fillTopicForm(topic) {
     selectedSourceRefs = [{ pageId: topic.sourcePageId, title: `Source ${topic.sourcePageId}`, url: "", tags: [] }];
   }
   el.topicSourcePageId.value = topic.sourcePageId;
+  if (!el.sourceScopeMode.value) {
+    el.sourceScopeMode.value = "current-page";
+  }
+  applySourceScopeUi();
   el.sourceTagQuery.value = (topic.sourceTags || []).join(", ");
   el.topicDistinctionNotes.value = topic.distinctionNotes || "";
   el.topicTags.value = (topic.tags || []).join(", ");
@@ -589,6 +664,9 @@ function clearTopicForm() {
   qualityPreview = null;
   sourceCandidates = [];
   selectedSourceRefs = [];
+  el.sourceScopeMode.value = "current-page";
+  el.sourceScopePageId.value = "";
+  el.sourceTextQuery.value = "";
   const empty = createEmptyTopic();
   fillTopicForm(empty);
   setStatus(el.topicFormStatus, "Neues Topic gestartet.", "info");
@@ -694,6 +772,7 @@ function renderAll() {
   renderProviderBadge();
   renderProviderForm();
   renderConfluenceForm();
+  applySourceScopeUi();
   renderParentSelect();
   renderTopicTable();
   renderSourceCandidates();
@@ -760,11 +839,19 @@ function fallbackDerivedTopicFields(sourceSummaries, sourceTags) {
 
 async function loadSourceCandidates() {
   readConfluenceFormToState();
-  const tags = parseTags(el.sourceTagQuery.value);
-  setStatus(el.sourcePageStatus, "Lade Quellseiten...", "info");
+  const options = readSourceSearchOptions();
+  if (options.scopeMode === "custom-page" && !options.scopePageId) {
+    setStatus(el.sourcePageStatus, "Bitte Startseiten-ID fuer 'Eigene Startseite' eingeben.", "error");
+    return;
+  }
+  if (options.scopeMode === "root-tree" && !options.scopePageId) {
+    setStatus(el.sourcePageStatus, "Bitte zuerst eine Confluence Root Page ID konfigurieren.", "error");
+    return;
+  }
+  setStatus(el.sourcePageStatus, `Suche in Bereich: ${sourceScopeLabel(options)} ...`, "info");
 
   try {
-    const pages = await confluenceService.listSourcePagesByTags(tags);
+    const pages = await confluenceService.listSourcePagesByTags(options);
     sourceCandidates = dedupeSourceRefs(
       pages.map((page) => ({
         pageId: page.pageId,
@@ -781,7 +868,15 @@ async function loadSourceCandidates() {
     ]);
 
     renderSourceCandidates();
-    setStatus(el.sourcePageStatus, `${sourceCandidates.length} Quellseiten geladen.`, "ok");
+    const activeFilters = [];
+    if (options.tags.length) {
+      activeFilters.push(`Tags: ${options.tags.join(", ")}`);
+    }
+    if (options.textQuery) {
+      activeFilters.push(`Text: "${options.textQuery}"`);
+    }
+    const filterText = activeFilters.length ? ` | ${activeFilters.join(" | ")}` : "";
+    setStatus(el.sourcePageStatus, `${sourceCandidates.length} Treffer in ${sourceScopeLabel(options)}${filterText}`, "ok");
   } catch (error) {
     setStatus(el.sourcePageStatus, `Quellseiten konnten nicht geladen werden: ${error.message}`, "error");
   }
@@ -799,6 +894,7 @@ async function deriveTopicFieldsFromSources() {
 
   try {
     const sourceTags = parseTags(el.sourceTagQuery.value);
+    const options = readSourceSearchOptions();
     const summaries = await confluenceService.getSourcePageSummaries(refs.map((ref) => ref.pageId));
     const provider = providerManager.getActiveProvider();
 
@@ -808,8 +904,12 @@ async function deriveTopicFieldsFromSources() {
       "Wenn Inhalte sehr aehnlich zu bestehenden Topics sein koennten, distinctionNotes klar formulieren.",
       "Quellseiten:",
       JSON.stringify(summaries, null, 2),
+      "Bereich:",
+      sourceScopeLabel(options),
       "Tags-Filter:",
-      JSON.stringify(sourceTags)
+      JSON.stringify(sourceTags),
+      "Text-Suche:",
+      JSON.stringify(options.textQuery || "")
     ].join("\n");
 
     const response = await provider.generate({
@@ -1291,6 +1391,32 @@ function bindEvents() {
 
   el.loadSourcePagesBtn.addEventListener("click", () => {
     loadSourceCandidates();
+  });
+
+  el.selectAllSourcesBtn.addEventListener("click", () => {
+    selectAllDisplayedSources();
+  });
+
+  el.clearSelectedSourcesBtn.addEventListener("click", () => {
+    clearSelectedSources();
+  });
+
+  el.sourceScopeMode.addEventListener("change", () => {
+    applySourceScopeUi();
+  });
+
+  el.sourceScopePageId.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      loadSourceCandidates();
+    }
+  });
+
+  el.sourceTextQuery.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      loadSourceCandidates();
+    }
   });
 
   el.sourceTagQuery.addEventListener("keydown", (event) => {

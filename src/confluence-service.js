@@ -136,6 +136,18 @@ function pageUrl(config, page) {
   return `${origin}${webui}`;
 }
 
+function escapeCqlValue(value) {
+  return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function hasAllTags(page, tags) {
+  if (!tags.length) {
+    return true;
+  }
+  const tagSet = new Set(pageTags(page).map((tag) => tag.toLowerCase()));
+  return tags.every((tag) => tagSet.has(String(tag).toLowerCase()));
+}
+
 function parseMetadataFromStorageHtml(storageValue) {
   const raw = String(storageValue || "");
   const match = raw.match(/<pre\s+data-km-topic-metadata=\"true\">([\s\S]*?)<\/pre>/i);
@@ -264,16 +276,35 @@ export class ConfluenceService {
     const config = this.config();
     this.assertRequired(config);
 
-    const tags = Array.isArray(tagFilter)
-      ? tagFilter.map((tag) => String(tag || "").trim()).filter(Boolean)
-      : [];
+    const options = Array.isArray(tagFilter)
+      ? { tags: tagFilter, scopeMode: "current-page", scopePageId: "", textQuery: "" }
+      : {
+          tags: tagFilter?.tags || [],
+          scopeMode: String(tagFilter?.scopeMode || "current-page"),
+          scopePageId: String(tagFilter?.scopePageId || "").trim(),
+          textQuery: String(tagFilter?.textQuery || "").trim()
+        };
+
+    const tags = Array.isArray(options.tags) ? options.tags.map((tag) => String(tag || "").trim()).filter(Boolean) : [];
+    const textQuery = String(options.textQuery || "").trim();
 
     const currentPath = typeof window === "undefined" ? "" : String(window.location?.pathname || "");
     const currentPageMatch = currentPath.match(/\/pages\/(\d+)/);
-    const defaultPageId = currentPageMatch?.[1] || String(config.rootPageId);
+    const currentPageId = currentPageMatch?.[1] || "";
+    const scopeMode = options.scopeMode;
+    const scopePageId =
+      scopeMode === "root-tree"
+        ? String(config.rootPageId)
+        : scopeMode === "custom-page"
+          ? options.scopePageId
+          : currentPageId || String(config.rootPageId);
 
-    if (!tags.length) {
-      const page = await this.request(`/rest/api/content/${encodeURIComponent(defaultPageId)}?expand=metadata.labels`);
+    if (scopeMode === "current-page") {
+      const page = await this.request(`/rest/api/content/${encodeURIComponent(scopePageId)}?expand=metadata.labels`);
+      const titleMatch = !textQuery || String(page.title || "").toLowerCase().includes(textQuery.toLowerCase());
+      if (!hasAllTags(page, tags) || !titleMatch) {
+        return [];
+      }
       return [
         {
           pageId: String(page.id),
@@ -284,7 +315,19 @@ export class ConfluenceService {
       ];
     }
 
-    const cql = [`ancestor=${config.rootPageId}`, ...tags.map((tag) => `label="${tag.replace(/"/g, '\\"')}"`)].join(" AND ");
+    if (!scopePageId) {
+      throw new Error("Bereichs-ID fehlt. Bitte Root Page ID oder Startseiten-ID setzen.");
+    }
+
+    const cqlParts = [`type=page`, `ancestor=${scopePageId}`];
+    for (const tag of tags) {
+      cqlParts.push(`label="${escapeCqlValue(tag)}"`);
+    }
+    if (textQuery) {
+      cqlParts.push(`text ~ "${escapeCqlValue(textQuery)}"`);
+    }
+
+    const cql = cqlParts.join(" AND ");
     const data = await this.request(
       `/rest/api/content/search?cql=${encodeURIComponent(cql)}&limit=200&expand=metadata.labels`
     );

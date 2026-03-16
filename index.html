@@ -605,12 +605,33 @@
               </div>
             </div>
 
+            <h3>Quellen-Auswahl (Bereich + Suche)</h3>
+            <div class="grid-3">
+              <div class="field">
+                <label for="sourceScopeMode">Bereich</label>
+                <select id="sourceScopeMode">
+                  <option value="current-page">Aktuelle Seite</option>
+                  <option value="root-tree">Root-Bereich (Confluence Root Page)</option>
+                  <option value="custom-page">Eigene Startseite (Page ID)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="sourceScopePageId">Startseiten-ID (nur bei Eigene Startseite)</label>
+                <input id="sourceScopePageId" type="text" placeholder="z. B. 123456" />
+              </div>
+              <div class="field">
+                <label for="sourceTextQuery">Suche im Bereich (Text)</label>
+                <input id="sourceTextQuery" type="text" placeholder="z. B. Kreditlimit, Freigabe, SLA" />
+              </div>
+            </div>
             <div class="field">
-              <label for="sourceTagQuery">Quellseiten-Filter per Tag (kommagetrennt, leer = aktuelle Seite)</label>
+              <label for="sourceTagQuery">Tag-Filter im Bereich (kommagetrennt)</label>
               <input id="sourceTagQuery" type="text" placeholder="z. B. kredit,governance" />
             </div>
             <div class="btn-row">
-              <button id="loadSourcePagesBtn" type="button" class="secondary">Quellseiten laden</button>
+              <button id="loadSourcePagesBtn" type="button" class="secondary">Im Bereich suchen</button>
+              <button id="selectAllSourcesBtn" type="button" class="secondary">Alle Treffer markieren</button>
+              <button id="clearSelectedSourcesBtn" type="button" class="secondary">Auswahl leeren</button>
               <button id="deriveTopicFieldsBtn" type="button" class="warn">Felder per KI ableiten</button>
             </div>
             <div id="sourcePageStatus" class="status"></div>
