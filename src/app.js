@@ -11,8 +11,10 @@ import { EncryptedStore } from "./crypto-store.js";
 import { createDefaultState, mergeWithDefaults } from "./state.js";
 import { ProviderManager } from "./providers/provider-manager.js";
 import { ConfluenceService } from "./confluence-service.js";
+import { createSafeStorage } from "./safe-storage.js";
 
-const store = new EncryptedStore(window.localStorage);
+const storageRuntime = createSafeStorage();
+const store = new EncryptedStore(storageRuntime.storage);
 let state = createDefaultState();
 let sessionPassword = "";
 let selectedTopicId = "";
@@ -146,12 +148,16 @@ function unlockApp() {
 }
 
 function refreshLockUi() {
+  const modeHint = storageRuntime.persistent
+    ? ""
+    : " Hinweis: Browser blockiert persistentes localStorage. Daten gelten nur fuer diese Laufzeit.";
+
   if (store.hasAnyState()) {
-    el.lockDescription.textContent = "Lokaler Zustand gefunden. Bitte mit Passwort entsperren.";
+    el.lockDescription.textContent = `Lokaler Zustand gefunden. Bitte mit Passwort entsperren.${modeHint}`;
     el.confirmWrap.classList.add("hidden");
     el.unlockBtn.textContent = "Entsperren";
   } else {
-    el.lockDescription.textContent = "Erststart: Lege ein Passwort fest. Es wird nicht gespeichert.";
+    el.lockDescription.textContent = `Erststart: Lege ein Passwort fest. Es wird nicht gespeichert.${modeHint}`;
     el.confirmWrap.classList.remove("hidden");
     el.unlockBtn.textContent = "Passwort setzen";
   }
