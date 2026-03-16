@@ -22,6 +22,34 @@ let qualityPreview = null;
 
 const providerManager = new ProviderManager(() => state);
 const confluenceService = new ConfluenceService(() => state.confluence);
+const RUNTIME_STYLE_ID = "km-runtime-style";
+
+function ensureRuntimeStyle() {
+  if (document.getElementById(RUNTIME_STYLE_ID)) {
+    return;
+  }
+
+  const style = document.createElement("style");
+  style.id = RUNTIME_STYLE_ID;
+  style.textContent = `
+#kmAppRoot { max-width: 1260px; margin: 0 auto; padding: 14px; font-family: "Space Grotesk","Trebuchet MS","Segoe UI",sans-serif; }
+#kmAppRoot * { box-sizing: border-box; }
+#kmAppRoot .hidden { display: none !important; }
+#kmAppRoot .tab-panel { display: none !important; }
+#kmAppRoot .tab-panel.active { display: grid !important; gap: 12px !important; }
+#kmAppRoot .grid-2 { display: grid !important; gap: 12px !important; grid-template-columns: minmax(360px,1.15fr) minmax(300px,0.85fr) !important; }
+#kmAppRoot .grid-3 { display: grid !important; gap: 10px !important; grid-template-columns: repeat(3,minmax(180px,1fr)) !important; }
+#kmAppRoot .shell-head, #kmAppRoot .head-right, #kmAppRoot .tabs, #kmAppRoot .btn-row { display: flex !important; flex-wrap: wrap !important; gap: 8px !important; }
+#kmAppRoot .field { display: block !important; width: 100% !important; margin-bottom: 10px !important; }
+#kmAppRoot .field label { display: block !important; margin: 0 0 5px !important; font-weight: 700 !important; text-transform: uppercase !important; font-size: .83rem !important; }
+#kmAppRoot input, #kmAppRoot textarea, #kmAppRoot select, #kmAppRoot button { display: block !important; width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+#kmAppRoot .btn-row > * { flex: 1 1 140px !important; width: auto !important; }
+@media (max-width: 980px) { #kmAppRoot .grid-3 { grid-template-columns: repeat(2,minmax(180px,1fr)) !important; } }
+@media (max-width: 760px) { #kmAppRoot .grid-2, #kmAppRoot .grid-3 { grid-template-columns: 1fr !important; } }
+`;
+
+  (document.head || document.body || document.documentElement).appendChild(style);
+}
 
 let el = null;
 
@@ -247,6 +275,8 @@ async function handleUnlock() {
   try {
     if (store.hasAnyState()) {
       state = mergeWithDefaults(await store.load(password));
+      // Local-browser stays the default startup provider.
+      state.settings.activeProvider = "local-browser";
       sessionPassword = password;
       unlockApp();
       setStatus(el.lockStatus, "", "info");
@@ -1046,6 +1076,7 @@ function showBootError(error) {
 
 function boot() {
   try {
+    ensureRuntimeStyle();
     initialize();
   } catch (error) {
     showBootError(error);
